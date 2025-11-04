@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Tab Saver",
+  "version": "1.0",
+  "description": "Save and restore your open tabs to and from a file.",
+  "permissions": ["tabs", "downloads"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Tab Saver"
+  }
+}
+
