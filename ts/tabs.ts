@@ -1,7 +1,8 @@
+// ...existing code...
 // Function to get all windows and their tabs
-async function displayWindowsAndTabs() {
+async function displayWindowsAndTabs(): Promise<void> {
     const windows = await chrome.windows.getAll({ populate: true });
-    const container = document.getElementById('windows-container');
+    const container = document.getElementById('windows-container')!;
     container.innerHTML = ''; // Clear existing content
 
     windows.forEach((window, index) => {
@@ -11,10 +12,10 @@ async function displayWindowsAndTabs() {
 
         const windowTitle = document.createElement('div');
         windowTitle.className = 'window-title';
-        windowTitle.textContent = `Window ${index + 1} (${window.tabs.length} tabs)`;
+        windowTitle.textContent = `Window ${index + 1} (${window.tabs!.length} tabs)`;
         windowDiv.appendChild(windowTitle);
 
-        window.tabs.forEach(tab => {
+        window.tabs!.forEach(tab => {
             const tabDiv = document.createElement('div');
             tabDiv.className = 'tab';
 
@@ -26,19 +27,19 @@ async function displayWindowsAndTabs() {
             // Tab title
             const title = document.createElement('span');
             title.className = 'tab-title';
-            title.textContent = tab.title;
+            title.textContent = tab.title!;
             tabDiv.appendChild(title);
 
             // Tab URL
             const url = document.createElement('span');
             url.className = 'tab-url';
-            url.textContent = tab.url;
+            url.textContent = tab.url!;
             tabDiv.appendChild(url);
 
             // Make the tab div clickable to focus that tab
             tabDiv.addEventListener('click', () => {
-                chrome.windows.update(window.id, { focused: true });
-                chrome.tabs.update(tab.id, { active: true });
+                chrome.windows.update(window.id!, { focused: true });
+                chrome.tabs.update(tab.id!, { active: true });
             });
 
             windowDiv.appendChild(tabDiv);
@@ -52,4 +53,5 @@ async function displayWindowsAndTabs() {
 document.addEventListener('DOMContentLoaded', displayWindowsAndTabs);
 
 // Refresh every 5 seconds to keep the list updated
-// setInterval(displayWindowsAndTabs, 50000);
+// setInterval(displayWindowsAndTabs, 5000);
+

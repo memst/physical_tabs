@@ -1,0 +1,13 @@
+{
+    "name": "tab_manager",
+    "version": "1.0.0",
+    "description": "Chrome extension to manage tabs and workspaces, migrated to TypeScript.",
+    "scripts": {
+        "build": "pnpm tsc",
+        "watch": "pnpm tsc --watch"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0",
+        "@types/chrome": "^0.0.246"
+    }
+}

@@ -12,5 +12,17 @@
   "action": {
     "default_popup": "popup.html",
     "default_title": "Tab Saver"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "dist/popup.js",
+        "dist/tabs.js",
+        "dist/workspace.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
 }
