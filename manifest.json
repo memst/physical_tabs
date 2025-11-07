@@ -3,10 +3,14 @@
   "name": "Tab Saver",
   "version": "1.0",
   "description": "Save and restore your open tabs to and from a file.",
-  "permissions": ["tabs", "downloads"],
+  "permissions": [
+    "tabs",
+    "downloads",
+    "windows",
+    "storage"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Tab Saver"
   }
 }
-
