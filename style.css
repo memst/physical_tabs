@@ -1,0 +1,101 @@
+body {
+    font-family: sans-serif;
+    margin: 20px;
+}
+
+h2 {
+    color: #333;
+    margin-top: 30px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #eee;
+}
+
+.workspaces-section {
+    margin-bottom: 40px;
+}
+
+.workspace-item {
+    margin-bottom: 15px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background-color: #f8f9fa;
+}
+
+.workspace-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.workspace-title {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.workspace-details {
+    color: #666;
+    font-size: 0.9em;
+}
+
+.delete-workspace {
+    margin-left: auto;
+    padding: 5px 10px;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.delete-workspace:hover {
+    background-color: #c82333;
+}
+
+.windows-section {
+    margin-top: 20px;
+}
+
+.window {
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.window-title {
+    font-weight: bold;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.tab:hover {
+    background-color: #f0f0f0;
+}
+
+.tab img {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+}
+
+.tab-title {
+    margin-right: 8px;
+}
+
+.tab-url {
+    color: #666;
+    font-size: 0.9em;
+    margin-left: auto;
+}

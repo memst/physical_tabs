@@ -4,59 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <title>Tab Manager</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            margin: 20px;
-        }
-
-        .window {
-            margin-bottom: 20px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            padding: 10px;
-        }
-
-        .window-title {
-            font-weight: bold;
-            margin-bottom: 10px;
-            padding-bottom: 5px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .tab {
-            display: flex;
-            align-items: center;
-            padding: 5px;
-            border-radius: 4px;
-        }
-
-        .tab:hover {
-            background-color: #f0f0f0;
-        }
-
-        .tab img {
-            width: 16px;
-            height: 16px;
-            margin-right: 8px;
-        }
-
-        .tab-title {
-            margin-right: 8px;
-        }
-
-        .tab-url {
-            color: #666;
-            font-size: 0.9em;
-            margin-left: auto;
-        }
-    </style>
+    <link rel="stylesheet" type="text/css" href="style.css">
 </head>
 
 <body>
     <h2>Chrome Windows and Tabs</h2>
     <div id="windows-container"></div>
-    <script src="dist/tabs.js"></script>
+    <script type="module" src="dist/tabs.js"></script>
 </body>
 
 </html>

@@ -16,9 +16,7 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "dist/popup.js",
-        "dist/tabs.js",
-        "dist/workspace.js"
+        "dist/*.js"
       ],
       "matches": [
         "<all_urls>"

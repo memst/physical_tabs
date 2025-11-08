@@ -1,3 +1,7 @@
+
+console.log("test");
+import { createWorkspace, Workspace, WorkspaceStorage } from "./workspaceStorage.js"
+
 // ...existing code...
 // Handle save tabs (current window only)
 document.getElementById('save')!.addEventListener('click', async () => {
@@ -44,28 +48,27 @@ document.getElementById('manage')!.addEventListener('click', () => {
     });
 });
 
-// Generate a unique workspace ID
-function generateWorkspaceId(): string {
-    return 'ws_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
+
+document.getElementById('makeWorkspace')!.addEventListener('click', async () => {
+    const workspace = await createWorkspace();
+
+    const currentWindow = await chrome.windows.getCurrent();
+
+    // Create the pinned workspace tab in the new window
+    await chrome.tabs.create({
+        windowId: currentWindow.id,
+        url: `workspace.html?id=${workspace.workspaceId}`,
+        pinned: true,
+        active: true,
+        index: 0  // This ensures it's the leftmost tab
+    });
+});
+
 
 // Handle creating a managed window
 document.getElementById('createWorkspace')!.addEventListener('click', async () => {
-    // Generate a new workspace ID
-    const workspaceId = generateWorkspaceId();
 
-    // Get existing workspaces
-    const result = await chrome.storage.local.get('workspaces');
-    const workspaces = result.workspaces || {};
-
-    // Create new workspace data
-    workspaces[workspaceId] = {
-        created: Date.now(),
-        lastAccessed: Date.now()
-    };
-
-    // Save updated workspaces
-    await chrome.storage.local.set({ workspaces });
+    const workspace = await createWorkspace();
 
     // Create a new window
     const newWindow = await chrome.windows.create({
@@ -76,9 +79,9 @@ document.getElementById('createWorkspace')!.addEventListener('click', async () =
     // Create the pinned workspace tab in the new window
     await chrome.tabs.create({
         windowId: newWindow.id,
-        url: `workspace.html?id=${workspaceId}`,
+        url: `workspace.html?id=${workspace.workspaceId}`,
         pinned: true,
-        active: false,
+        active: true,
         index: 0  // This ensures it's the leftmost tab
     });
 });
