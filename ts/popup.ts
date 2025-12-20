@@ -41,7 +41,25 @@ async function saveCurrentWindow(additionaTabs?: string[][], filename?: string) 
 
 // ...existing code...
 // Handle save tabs (current window only)
-document.getElementById('save')!.addEventListener('click', async () => saveCurrentWindow());
+document.getElementById('save')!.addEventListener('click', async () => {
+    // Ask the user for a filename
+    const rawName = window.prompt('Enter a name for the saved tabs (without extension):', 'tabs_window');
+    // If the user cancelled the prompt, do nothing
+    if (rawName === null) return;
+
+    // Sanitize: lowercase, replace non-alphanumerics with underscores, collapse underscores
+    let name = rawName.toLowerCase();
+    name = name.replace(/[^a-z0-9]+/g, '_');
+    name = name.replace(/_+/g, '_');
+    name = name.replace(/^_+|_+$/g, '');
+    if (!name) name = 'tabs';
+
+    // Ensure prefix and suffix
+    if (!name.startsWith('tabs_')) name = `tabs_${name}`;
+    if (!name.endsWith('.json')) name = `${name}.json`;
+
+    await saveCurrentWindow(undefined, name);
+});
 
 // Handle restore tabs
 document.getElementById('load')!.addEventListener('click', () => {
