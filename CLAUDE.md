@@ -1,74 +1,201 @@
-# Agent Learnings: Chrome Tab Manager Extension
+# CLAUDE.md
 
-## Overview
-This document summarizes the key learnings and implementations from developing a Chrome extension for tab and workspace management. The extension allows users to save/restore tabs, manage multiple windows, and organize them into named workspaces.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Core Extension Structure
-- **Manifest Version 3**: Used MV3 with permissions for `tabs`, `windows`, `storage`, and `downloads`.
-- **Popup Interface**: Main UI via `popup.html` and `popup.js`, providing quick access to features.
-- **Background Pages**: Separate HTML pages like `tabs.html` and `workspace.html` for detailed views.
-- **TypeScript Compilation**: Source in `ts/` directory, compiled to `dist/` with ES modules.
+## Project Overview
 
-## Key Features Implemented
+A Chrome Manifest V3 extension for managing browser tabs and workspaces. Users can save/restore tabs to JSON files, create named workspaces, and organize multiple windows with persistent tracking.
+
+## Build and Development Commands
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build TypeScript to JavaScript (one-time)
+pnpm build
+
+# Watch mode for development (auto-recompile on changes)
+pnpm watch
+```
+
+After building, load the extension in Chrome:
+1. Navigate to `chrome://extensions`
+2. Enable "Developer mode"
+3. Click "Load unpacked"
+4. Select this repository directory
+
+## Code Architecture
+
+### TypeScript Module System
+
+- **Source**: `ts/` directory contains TypeScript source files
+- **Output**: `dist/` directory contains compiled ES modules (gitignored)
+- **Critical import pattern**: All imports use `.js` extension (e.g., `import { foo } from './bar.js'`) even though source files are `.ts`. This is required for ES modules to work in the browser after compilation.
+- **Module loading**: All HTML pages use `<script type="module">` to handle ES module `export` statements
+- **TypeScript config**: Target ES2024, ESNext modules, strict mode enabled
+
+### Entry Points
+
+1. **popup.html** → `dist/popup.js` - Main extension popup with save/restore/workspace buttons
+2. **tabs.html** → `dist/tabs.js` - Full-page tab manager (refreshes every 5 seconds)
+3. **workspace.html** → `dist/workspace.js` - Pinned tab in workspace windows, loaded with `?id=<workspaceId>` parameter
+
+### Core Modules
+
+**workspaceStorage.ts** - Central storage management
+- Interfaces: `Workspace`, `WorkspaceStorage`
+- Uses TypeScript branded types pattern: `type WorkspaceId = Distinct<string, 'WorkspaceId'>`
+- Key functions:
+  - `getWorkspaces()` - Retrieves all workspaces from chrome.storage.local
+  - `createWorkspace()` - Generates unique ID (`ws_<timestamp>_<random>`)
+  - `getWindowWorkspace(window)` - Scans pinned tabs for workspace.html URLs
+  - `refreshWorkspaceStorage()` - Rebuilds window associations from scratch
+  - `deleteEmptyWorkspaces()` - Removes workspaces with no active windows
+
+**workspaceSection.ts** - Shared UI component
+- Exports `createWorkspacesSection(redrawCallback)`
+- Creates DOM elements for workspace list with management controls
+- Used by both tabs.html and workspace.html for consistency
+
+**popup.ts** - Main extension logic
+- Tab save/restore with JSON file download/upload
+- Workspace creation in new or current window
+- Filename sanitization for saved tabs
+
+**tabs.ts** - Tab manager page
+- Displays all windows and tabs with favicons
+- Workspace overview and management
+- Runs `cleanupInactiveWindows()` on load to remove closed window references
+
+**workspace.ts** - Workspace window page
+- Registers current window with workspace on load
+- Editable workspace naming with persistence
+- Displays workspace metadata
+
+## Key Features & Implementation
 
 ### Tab Saving and Restoration
-- **Save Current Window**: Filters out extension tabs, saves tab titles and URLs to JSON, downloads file, then closes saved tabs.
-- **Restore Tabs**: Uploads JSON file and creates tabs from URLs.
-- **Append Mode**: Merges saved tabs with current window before saving.
-- **Filename Sanitization**: User input cleaned to lowercase, prefixed with `tabs_`, suffixed with `.json`, special chars replaced with underscores.
+
+**Save Current Window**:
+- Filters out extension tabs (hardcoded extension ID check in popup.ts:9)
+- Converts to `[title, url]` pairs in JSON format
+- Downloads file, then closes saved tabs only after download completes
+- Uses download listener pattern to prevent data loss if cancelled
+
+**Filename Sanitization** (popup.ts:50-59):
+```javascript
+// Lowercase, replace non-alphanumeric with underscores
+name = rawName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+// Enforce tabs_ prefix and .json suffix
+if (!name.startsWith('tabs_')) name = `tabs_${name}`;
+if (!name.endsWith('.json')) name = `${name}.json`;
+```
+
+**Restore Tabs**:
+- Parses JSON file and creates tabs from URLs
+- Validates array structure before creating tabs
+
+**Append Mode**:
+- Merges uploaded tabs with current window tabs before saving
+- Handles both `[title, url]` and plain URL string formats
 
 ### Workspace Management
-- **Workspace Creation**: Generates unique IDs, stores metadata (creation time, name, window list) in `chrome.storage.local`.
-- **Window Tracking**: Each workspace tracks associated window IDs; windows auto-register when workspace tabs are opened.
-- **Pinned Workspace Tabs**: Each workspace window has a pinned tab showing workspace info and allowing name editing.
-- **Workspace Naming**: Editable via workspace page, persisted in storage.
-- **Cleanup**: Automatic removal of closed windows from workspaces; manual deletion of empty workspaces.
+
+**Workspace Creation**:
+- Generates unique IDs: `ws_<timestamp>_<random>`
+- Stores metadata in chrome.storage.local: `{created, lastAccessed, name, workspaceId, windows: []}`
+- Each workspace tracks associated window IDs array
+
+**Window Tracking**:
+- Windows associate with workspaces by having a pinned `workspace.html?id=<workspaceId>` tab
+- When workspace.html loads, it reads ID from URL params and adds current window ID to workspace.windows array
+- Workspace tabs are always pinned at index 0 (leftmost position)
+
+**Workspace Naming**:
+- Editable via input field in workspace.html
+- Saves on button click or Enter key press
+- Updates document title and shows visual "Saved!" indicator
+
+**Cleanup Logic**:
+- tabs.html: `cleanupInactiveWindows()` removes references to closed windows
+- workspaceStorage.ts: `refreshWorkspaceStorage()` clears all window arrays and rebuilds from currently open windows
+- Empty workspaces can be deleted individually or in bulk
 
 ### Tab Manager Page
-- **Window and Tab Listing**: Displays all Chrome windows with their tabs, including favicons and URLs.
-- **Workspace Overview**: Lists all workspaces with window counts, creation dates, and management buttons.
-- **Interactive Controls**: Click tabs to focus/switch; add current window to workspace; delete empty workspaces.
-- **Auto-Refresh**: Updates every 5 seconds to reflect changes.
 
-### Technical Implementation Details
+- Lists all Chrome windows with tabs (favicons, titles, URLs)
+- Click any tab to focus that window and activate the tab
+- Workspace overview section with window counts and creation dates
+- "Add current window" button reassigns workspace or creates pinned tab
+- Auto-refresh every 5 seconds to reflect changes
 
-#### Storage and State Management
-- **chrome.storage.local**: Used for persisting workspaces and their metadata.
-- **Window Registration**: When opening workspace tabs, windows are added to workspace arrays.
-- **Cleanup Logic**: On page load, removes references to non-existent windows.
+## Chrome Extension APIs
 
-#### UI and User Experience
-- **HTML/CSS**: Clean, responsive design with hover effects and proper spacing.
-- **Event Handling**: Async operations for Chrome API calls, error logging.
-- **Module Loading**: ES modules in HTML with `type="module"` to handle `export` statements.
+**Permissions** (manifest.json):
+- `tabs`, `windows`, `storage`, `downloads`
 
-#### TypeScript Patterns
-- **Interfaces**: Defined for `Workspace`, `WorkspaceStorage` as records.
-- **Async Functions**: Extensive use for Chrome API interactions.
-- **Error Handling**: Try-catch blocks with console logging and user alerts.
+**Common Patterns**:
+```javascript
+// Query tabs
+const tabs = await chrome.tabs.query({ currentWindow: true });
 
-#### Chrome Extension APIs Used
-- **chrome.tabs**: Query, create, update, remove tabs.
-- **chrome.windows**: Get all windows, create new windows, get current window.
-- **chrome.storage**: Local storage for persistence.
-- **chrome.downloads**: Download JSON files, listen for completion.
+// Get all windows with tabs
+const windows = await chrome.windows.getAll({ populate: true });
 
-## Challenges and Solutions
-- **Module Syntax Errors**: Resolved by adding `type="module"` to script tags for ES module support.
-- **Window Tracking**: Implemented cleanup to handle closed windows and prevent stale references.
-- **Filename Sanitization**: Regex patterns to ensure valid, consistent filenames.
-- **Concurrent Access**: Storage operations are atomic but may need retry logic for high concurrency.
+// Storage operations (atomic but not transactional)
+const result = await chrome.storage.local.get('workspaces');
+await chrome.storage.local.set({ workspaces });
 
-## Future Enhancements
-- **Background Script**: For centralized storage management and event handling.
-- **Workspace Persistence**: Save/restore entire workspace states.
-- **Tab Groups**: Integration with Chrome's tab groups feature.
-- **Search and Filtering**: In tab manager for better navigation.
-- **Settings Page**: For user preferences and customization.
+// Create pinned workspace tab at leftmost position
+await chrome.tabs.create({
+  windowId: windowId,
+  url: `workspace.html?id=${workspaceId}`,
+  pinned: true,
+  active: true,
+  index: 0
+});
 
-## Development Workflow
-- **TypeScript Compilation**: `tsc -p tsconfig.json` with watch mode.
-- **Testing**: Load unpacked extension in Chrome, test popup and pages.
-- **Version Control**: Incremental feature additions with modular code structure.
+// Download with completion listener
+chrome.downloads.onChanged.addListener(onChanged);
+downloadId = await chrome.downloads.download({
+  url: blobUrl,
+  filename: 'tabs.json',
+  saveAs: true
+});
+```
 
-This extension demonstrates comprehensive use of Chrome Extension APIs, TypeScript for type safety, and modern web development practices for building user-friendly productivity tools.
+## Important Implementation Details
+
+**Download-Then-Close Pattern** (popup.ts:16-21):
+- Listener waits for download completion before closing tabs
+- Prevents premature tab closure if user cancels save dialog
+- downloadId is captured in closure for listener cleanup
+
+**Window-Workspace Association**:
+- Association is determined by presence of pinned workspace.html tab
+- `getWindowWorkspace()` scans only pinned tabs for efficiency
+- If workspace tab found without ID, it's automatically removed
+
+**Storage Cleanup**:
+- No centralized background script for event handling
+- Cleanup runs on-demand when pages load (tabs.html, workspace.html)
+- `refreshWorkspaceStorage()` rebuilds associations from scratch
+- Storage operations are atomic but may need retry logic for high concurrency
+
+**Module Syntax**:
+- TypeScript compiles with `export` statements
+- HTML pages must use `<script type="module">` to load compiled JS
+- Without `type="module"`, browser throws syntax errors on `export` keyword
+
+## Challenges & Solutions
+
+**Module Syntax Errors**: Resolved by adding `type="module"` to script tags for ES module support.
+
+**Window Tracking**: Implemented cleanup to handle closed windows and prevent stale references. Multiple cleanup strategies: on-load cleanup in tabs.html, refresh from scratch in refreshWorkspaceStorage().
+
+**Filename Sanitization**: Regex patterns ensure valid, consistent filenames (lowercase, underscores, proper prefix/suffix).
+
+**Concurrent Access**: Storage operations are atomic but not transactional. Current implementation assumes single-user sequential operations. High concurrency scenarios may need optimistic locking or retry logic.
+
+**Extension Tab Filtering**: Hardcoded extension ID in popup.ts:9 for filtering. This ID is specific to the development environment and would need updating for production.

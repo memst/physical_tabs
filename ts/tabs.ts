@@ -91,7 +91,62 @@ async function displayWorkspacesAndWindows(): Promise<void> {
 }
 
 // Initial load
-document.addEventListener('DOMContentLoaded', displayWorkspacesAndWindows);
+document.addEventListener('DOMContentLoaded', () => {
+    displayWorkspacesAndWindows();
+    setupImportModal();
+});
+
+// Import Modal Logic
+function setupImportModal(): void {
+    const modal = document.getElementById('import-modal') as HTMLElement;
+    const btn = document.getElementById('import-tabs-btn') as HTMLButtonElement;
+    const span = document.getElementsByClassName('close')[0] as HTMLElement;
+    const openBtn = document.getElementById('import-open-btn') as HTMLButtonElement;
+    const textarea = document.getElementById('import-urls') as HTMLTextAreaElement;
+
+    if (!modal || !btn || !span || !openBtn || !textarea) return;
+
+    btn.onclick = function () {
+        modal.style.display = "block";
+        textarea.focus();
+    }
+
+    span.onclick = function () {
+        modal.style.display = "none";
+    }
+
+    window.onclick = function (event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    }
+
+    openBtn.onclick = function () {
+        const text = textarea.value;
+        const urls = parseUrls(text);
+        if (urls.length > 0) {
+            chrome.windows.create({ url: urls });
+            modal.style.display = "none";
+            textarea.value = ''; // Clear input
+        } else {
+            alert('No valid URLs found!');
+        }
+    }
+}
+
+function parseUrls(text: string): string[] {
+    const lines = text.split('\n');
+    const urls: string[] = [];
+    const urlRegex = /(https?:\/\/[^\s]+)/;
+
+    for (const line of lines) {
+        const match = line.match(urlRegex);
+        if (match) {
+            urls.push(match[0]);
+        }
+    }
+    return urls;
+}
 
 // Refresh every 5 seconds to keep the list updated
 setInterval(displayWorkspacesAndWindows, 5000);
