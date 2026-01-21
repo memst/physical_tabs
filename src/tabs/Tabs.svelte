@@ -2,7 +2,7 @@
     import { onMount, onDestroy } from "svelte";
     import WorkspaceList from "../lib/WorkspaceList.svelte";
     import WindowTabList from "../lib/WindowTabList.svelte";
-    import TabItem from "../lib/TabItem.svelte";
+    import SavedWindowItem from "../lib/SavedWindowItem.svelte";
     import {
         type WorkspaceStorage,
         refreshWorkspaceStorage,
@@ -133,10 +133,7 @@
         <h2>Saved Files (DB)</h2>
         <div class="file-list">
             {#each savedFiles as file}
-                <div class="file-item">📄 {file.filename}</div>
-                {#each file.tabs as tab}
-                    <TabItem title={tab.title} url={tab.url} />
-                {/each}
+                <SavedWindowItem {file} />
             {/each}
         </div>
     </div>
@@ -184,18 +181,7 @@
         background-color: #f5f5f5;
         border-radius: 5px;
     }
-    .file-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    .file-item {
-        background-color: white;
-        padding: 5px 10px;
-        border-radius: 3px;
-        border: 1px solid #ddd;
-        font-size: 0.9em;
-    }
+    /* .file-list removed */
     /* Modal Styles */
     .modal {
         display: block;
