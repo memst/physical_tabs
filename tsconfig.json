@@ -3,14 +3,16 @@
         "target": "ES2024",
         "module": "ESNext",
         "outDir": "dist",
-        "rootDir": "ts",
+        "rootDir": "src",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true
     },
     "include": [
-        "ts/**/*.ts"
+        "src/**/*.ts",
+        "src/**/*.d.ts",
+        "src/**/*.svelte"
     ],
     "exclude": [
         "node_modules",

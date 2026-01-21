@@ -4,7 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Chrome Manifest V3 extension for managing browser tabs and workspaces. Users can save/restore tabs to JSON files, create named workspaces, and organize multiple windows with persistent tracking.
+A Chrome Manifest V3 extension for managing browser tabs and workspaces. It allows users to:
+1.  **Save Tabs**: Export current tabs to JSON files.
+2.  **Persistent Backup**: Automatically save tabs to a user-selected local folder using the File System Access API.
+3.  **Workspaces**: Organize windows into named workspaces with persistent tracking.
+4.  **Import**: Batch open URLs from a text list.
+5.  **Tab Manager**: Visualize and manage open windows and tabs.
+
+**Tech Stack**:
+-   **Framework**: Svelte 4/5 + TypeScript
+-   **Build Tool**: Vite + @crxjs/vite-plugin
+-   **Manifest**: V3
 
 ## Build and Development Commands
 
@@ -12,190 +22,95 @@ A Chrome Manifest V3 extension for managing browser tabs and workspaces. Users c
 # Install dependencies
 pnpm install
 
-# Build TypeScript to JavaScript (one-time)
-pnpm build
+# Development (HMR)
+pnpm dev
 
-# Watch mode for development (auto-recompile on changes)
-pnpm watch
+# Build for Production
+pnpm build
 ```
 
-After building, load the extension in Chrome:
-1. Navigate to `chrome://extensions`
-2. Enable "Developer mode"
-3. Click "Load unpacked"
-4. Select this repository directory
+After building, load the `dist/` directory in Chrome (`chrome://extensions` > "Load unpacked").
 
 ## Code Architecture
 
-### TypeScript Module System
+### Source Structure (`src/`)
 
-- **Source**: `ts/` directory contains TypeScript source files
-- **Output**: `dist/` directory contains compiled ES modules (gitignored)
-- **Critical import pattern**: All imports use `.js` extension (e.g., `import { foo } from './bar.js'`) even though source files are `.ts`. This is required for ES modules to work in the browser after compilation.
-- **Module loading**: All HTML pages use `<script type="module">` to handle ES module `export` statements
-- **TypeScript config**: Target ES2024, ESNext modules, strict mode enabled
+-   **`src/lib/`**: Shared utilities and business logic.
+    -   `db.ts`: IndexedDB wrapper for persistent `FileSystemDirectoryHandle` storage.
+    -   `workspaceStorage.ts`: Workspace data management (Chrome Storage Local).
+    -   `WorkspaceList.svelte`: Reusable UI component for listing workspaces.
+-   **`src/popup/`**: Extension popup.
+    -   `Popup.svelte`: Main UI for saving, restoring, and setting backup folder.
+-   **`src/tabs/`**: Full-page tab manager (`tabs.html`).
+    -   `Tabs.svelte`: Lists all windows/tabs, handles import.
+-   **`src/workspace/`**: Workspace manager (`workspace.html`).
+    -   `Workspace.svelte`: Managed window UI, workspace renaming.
 
-### Entry Points
+### Key Features & Implementation
 
-1. **popup.html** → `dist/popup.js` - Main extension popup with save/restore/workspace buttons
-2. **tabs.html** → `dist/tabs.js` - Full-page tab manager (refreshes every 5 seconds)
-3. **workspace.html** → `dist/workspace.js` - Pinned tab in workspace windows, loaded with `?id=<workspaceId>` parameter
+#### 1. Svelte + Vite Migration
+The project was migrated from vanilla TypeScript to Svelte + Vite.
+-   **Entry Points**: Defined in `vite.config.ts` (`popup`, `tabs`, `workspace`).
+-   **CRXJS**: Handles manifest generation and hot reloading for extension context.
+-   **Components**: Logic moved from monolytic `.ts` files to declarative `.svelte` components.
 
-### Core Modules
+#### 2. Persistent Folder Backup (`src/lib/db.ts`)
+-   **Goal**: Save tab exports to a specific local folder without repeated prompts.
+-   **Tech**: File System Access API + IndexedDB.
+-   **Flow**:
+    1.  User clicks "Set Backup Folder" (`window.showDirectoryPicker`).
+    2.  Handle is stored in IndexedDB (`db.ts`).
+    3.  Future saves check for handle, request permission (`mode: 'readwrite'`), and write directly.
+    4.  Fallback to `chrome.downloads` if no folder is set or permission denied.
 
-**workspaceStorage.ts** - Central storage management
-- Interfaces: `Workspace`, `WorkspaceStorage`
-- Uses TypeScript branded types pattern: `type WorkspaceId = Distinct<string, 'WorkspaceId'>`
-- Key functions:
-  - `getWorkspaces()` - Retrieves all workspaces from chrome.storage.local
-  - `createWorkspace()` - Generates unique ID (`ws_<timestamp>_<random>`)
-  - `getWindowWorkspace(window)` - Scans pinned tabs for workspace.html URLs
-  - `refreshWorkspaceStorage()` - Rebuilds window associations from scratch
-  - `deleteEmptyWorkspaces()` - Removes workspaces with no active windows
+#### 3. Workspace Management (`src/lib/workspaceStorage.ts`)
+-   **Storage**: `chrome.storage.local`.
+-   **Data Model**: `{ workspaces: { [id]: { name, windows: [windowId], created } } }`.
+-   **Tracking**: A pinned tab (`workspace.html?id=...`) identifies a window as belonging to a workspace.
+-   **Cleanup**: `cleanupInactiveWindows()` removes closed window IDs from storage.
 
-**workspaceSection.ts** - Shared UI component
-- Exports `createWorkspacesSection(redrawCallback)`
-- Creates DOM elements for workspace list with management controls
-- Used by both tabs.html and workspace.html for consistency
+#### 4. Tab Import
+-   **UI**: Generic modal in `Tabs.svelte`.
+-   **Logic**: Parses text for `https?://` patterns and opens them in a new window via `chrome.windows.create({ url: urls })`.
 
-**popup.ts** - Main extension logic
-- Tab save/restore with JSON file download/upload
-- Workspace creation in new or current window
-- Filename sanitization for saved tabs
+## Chrome Extension Patterns
 
-**tabs.ts** - Tab manager page
-- Displays all windows and tabs with favicons
-- Workspace overview and management
-- Runs `cleanupInactiveWindows()` on load to remove closed window references
+-   **Permissions**: `tabs`, `windows`, `storage`, `downloads`.
+-   **File System Access**: No manifest permission needed; relies on user gesture + runtime prompt.
+-   **ES Modules**: Vite compiles everything to ES modules in `dist/`.
 
-**workspace.ts** - Workspace window page
-- Registers current window with workspace on load
-- Editable workspace naming with persistence
-- Displays workspace metadata
+## Recent Changes
+-   **Migrated to Svelte**: Refactored `popup.ts`, `tabs.ts`, `workspace.ts` into Svelte components.
+-   **Removed Legacy**: Deleted old `ts/` directory and root HTML files.
+-   **Added Persistent Storage**: Implemented `src/lib/db.ts` for folder handles.
 
-## Key Features & Implementation
+## Chrome Extension Development Notes
 
-### Tab Saving and Restoration
+### HTML File Paths
+After the Svelte migration, all HTML files are built under `dist/src/`:
+- `dist/src/popup/index.html`
+- `dist/src/tabs/index.html`
+- `dist/src/workspace/index.html`
 
-**Save Current Window**:
-- Filters out extension tabs (hardcoded extension ID check in popup.ts:9)
-- Converts to `[title, url]` pairs in JSON format
-- Downloads file, then closes saved tabs only after download completes
-- Uses download listener pattern to prevent data loss if cancelled
-
-**Filename Sanitization** (popup.ts:50-59):
-```javascript
-// Lowercase, replace non-alphanumeric with underscores
-name = rawName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-// Enforce tabs_ prefix and .json suffix
-if (!name.startsWith('tabs_')) name = `tabs_${name}`;
-if (!name.endsWith('.json')) name = `${name}.json`;
+When referencing these from `chrome.tabs.create()` calls, use the `src/` prefix:
+```typescript
+chrome.tabs.create({ url: "src/tabs/index.html", active: true });
+chrome.tabs.create({ url: `src/workspace/index.html?id=${workspaceId}`, active: true });
 ```
 
-**Restore Tabs**:
-- Parses JSON file and creates tabs from URLs
-- Validates array structure before creating tabs
+### Development Workflow
 
-**Append Mode**:
-- Merges uploaded tabs with current window tabs before saving
-- Handles both `[title, url]` and plain URL string formats
+**Don't use:** `pnpm dev` - Starts Vite's dev server (localhost:5173) which doesn't work for Chrome extensions.
 
-### Workspace Management
+**Use instead:** `pnpm dev:watch` - Continuously rebuilds production files to `dist/` on file changes.
 
-**Workspace Creation**:
-- Generates unique IDs: `ws_<timestamp>_<random>`
-- Stores metadata in chrome.storage.local: `{created, lastAccessed, name, workspaceId, windows: []}`
-- Each workspace tracks associated window IDs array
+#### Setup:
+1. Run `pnpm dev:watch` in terminal
+2. Load unpacked extension from `dist/` folder in Chrome (`chrome://extensions/`)
+3. Make changes to source files
+4. Click reload button in Chrome extensions page to see changes
 
-**Window Tracking**:
-- Windows associate with workspaces by having a pinned `workspace.html?id=<workspaceId>` tab
-- When workspace.html loads, it reads ID from URL params and adds current window ID to workspace.windows array
-- Workspace tabs are always pinned at index 0 (leftmost position)
-
-**Workspace Naming**:
-- Editable via input field in workspace.html
-- Saves on button click or Enter key press
-- Updates document title and shows visual "Saved!" indicator
-
-**Cleanup Logic**:
-- tabs.html: `cleanupInactiveWindows()` removes references to closed windows
-- workspaceStorage.ts: `refreshWorkspaceStorage()` clears all window arrays and rebuilds from currently open windows
-- Empty workspaces can be deleted individually or in bulk
-
-### Tab Manager Page
-
-- Lists all Chrome windows with tabs (favicons, titles, URLs)
-- Click any tab to focus that window and activate the tab
-- Workspace overview section with window counts and creation dates
-- "Add current window" button reassigns workspace or creates pinned tab
-- Auto-refresh every 5 seconds to reflect changes
-
-## Chrome Extension APIs
-
-**Permissions** (manifest.json):
-- `tabs`, `windows`, `storage`, `downloads`
-
-**Common Patterns**:
-```javascript
-// Query tabs
-const tabs = await chrome.tabs.query({ currentWindow: true });
-
-// Get all windows with tabs
-const windows = await chrome.windows.getAll({ populate: true });
-
-// Storage operations (atomic but not transactional)
-const result = await chrome.storage.local.get('workspaces');
-await chrome.storage.local.set({ workspaces });
-
-// Create pinned workspace tab at leftmost position
-await chrome.tabs.create({
-  windowId: windowId,
-  url: `workspace.html?id=${workspaceId}`,
-  pinned: true,
-  active: true,
-  index: 0
-});
-
-// Download with completion listener
-chrome.downloads.onChanged.addListener(onChanged);
-downloadId = await chrome.downloads.download({
-  url: blobUrl,
-  filename: 'tabs.json',
-  saveAs: true
-});
-```
-
-## Important Implementation Details
-
-**Download-Then-Close Pattern** (popup.ts:16-21):
-- Listener waits for download completion before closing tabs
-- Prevents premature tab closure if user cancels save dialog
-- downloadId is captured in closure for listener cleanup
-
-**Window-Workspace Association**:
-- Association is determined by presence of pinned workspace.html tab
-- `getWindowWorkspace()` scans only pinned tabs for efficiency
-- If workspace tab found without ID, it's automatically removed
-
-**Storage Cleanup**:
-- No centralized background script for event handling
-- Cleanup runs on-demand when pages load (tabs.html, workspace.html)
-- `refreshWorkspaceStorage()` rebuilds associations from scratch
-- Storage operations are atomic but may need retry logic for high concurrency
-
-**Module Syntax**:
-- TypeScript compiles with `export` statements
-- HTML pages must use `<script type="module">` to load compiled JS
-- Without `type="module"`, browser throws syntax errors on `export` keyword
-
-## Challenges & Solutions
-
-**Module Syntax Errors**: Resolved by adding `type="module"` to script tags for ES module support.
-
-**Window Tracking**: Implemented cleanup to handle closed windows and prevent stale references. Multiple cleanup strategies: on-load cleanup in tabs.html, refresh from scratch in refreshWorkspaceStorage().
-
-**Filename Sanitization**: Regex patterns ensure valid, consistent filenames (lowercase, underscores, proper prefix/suffix).
-
-**Concurrent Access**: Storage operations are atomic but not transactional. Current implementation assumes single-user sequential operations. High concurrency scenarios may need optimistic locking or retry logic.
-
-**Extension Tab Filtering**: Hardcoded extension ID in popup.ts:9 for filtering. This ID is specific to the development environment and would need updating for production.
+### Known Build Warnings
+The build shows accessibility warnings from `src/tabs/Tabs.svelte`:
+- Click handlers on `<div>` elements should have ARIA roles and keyboard event handlers
+- These are warnings only and don't prevent the extension from working

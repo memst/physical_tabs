@@ -8,7 +8,7 @@ export interface Workspace extends Record<string, unknown> {
     lastAccessed: number;
     name?: string;
     workspaceId: string;
-    windows: number[];
+    windows: chrome.windows.Window[];
 }
 
 export type WorkspaceStorage = Record<string, Workspace>;
@@ -27,7 +27,7 @@ export async function createWorkspace() {
         lastAccessed: Date.now(),
         name: `Workspace ${workspaceId}`,  // Default name
         workspaceId: workspaceId,
-        windows: []  // Initialize empty windows array
+        windows: []
     }
     // Create new workspace data
     workspaces[workspaceId] = workspace;
@@ -42,7 +42,7 @@ export async function getWindowWorkspace(window: chrome.windows.Window): Promise
         if (!tab.url) continue;
 
         const url = new URL(tab.url);
-        if (url.pathname.endsWith('/workspace.html') || url.pathname.endsWith('workspace.html')) {
+        if (url.pathname.endsWith('/workspace/index.html')) {
             const workspaceId = url.searchParams.get('id');
             if (workspaceId == null) { await chrome.tabs.remove(tab.id!); }
             else return [workspaceId as WorkspaceId, tab.id as TabId];
@@ -53,6 +53,7 @@ export async function getWindowWorkspace(window: chrome.windows.Window): Promise
 }
 
 export async function refreshWorkspaceStorage(): Promise<WorkspaceStorage> {
+    console.error('Refreshing workspace storage');
     const workspaces = (await getWorkspaces());
     for (const workspace of Object.values(workspaces)) {
         workspace.windows = [];
@@ -60,8 +61,9 @@ export async function refreshWorkspaceStorage(): Promise<WorkspaceStorage> {
     const windows = await chrome.windows.getAll({ populate: true });
     windows.forEach(async window => {
         const workspaceId = (await getWindowWorkspace(window))?.[0];
+        console.log("window to workspace:", window, workspaceId);
         if (workspaceId !== undefined) {
-            workspaces[workspaceId].windows.push(window.id!);
+            workspaces[workspaceId].windows.push(window);
         }
     }
     );
@@ -73,9 +75,10 @@ export async function removeWindowFromWorkspace(windowId: number, workspaceId: W
     const workspaces = await getWorkspaces();
     const workspace = workspaces[workspaceId];
     if (!workspace) return;
-    if (workspace.windows.includes(windowId)) {
-        const index = workspace.windows.indexOf(windowId);
-        workspace.windows.splice(index, 1);
+
+    const windowIndex = workspace.windows.findIndex(window => window.id === windowId);
+    if (windowIndex !== -1) {
+        workspace.windows.splice(windowIndex, 1);
         await chrome.storage.local.set({ workspaces });
     }
 }
