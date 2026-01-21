@@ -2,17 +2,19 @@
     import { onMount, onDestroy } from "svelte";
     import WorkspaceList from "../lib/WorkspaceList.svelte";
     import WindowTabList from "../lib/WindowTabList.svelte";
+    import TabItem from "../lib/TabItem.svelte";
     import {
         type WorkspaceStorage,
         refreshWorkspaceStorage,
     } from "../lib/workspaceStorage";
     import { getDirectoryHandle } from "../lib/db";
+    import { type SavedWindowFile, parseFile } from "../lib/windowFile";
 
     let windows: chrome.windows.Window[] = $state([]);
     let workspaceListComp: WorkspaceList;
     let showModal = $state(false);
     let importText = $state("");
-    let savedFiles: string[] = $state([]);
+    let savedFiles: SavedWindowFile[] = $state([]);
 
     // Cleanup inactive windows logic (ported from tabs.ts)
     async function cleanupInactiveWindows(): Promise<WorkspaceStorage> {
@@ -42,15 +44,17 @@
     async function loadFiles() {
         const handle = await getDirectoryHandle();
         if (handle) {
-            const files: string[] = [];
-            // @ts-ignore - TS might complain about async iterator on older dom libs
+            const entries: SavedWindowFile[] = [];
             await handle.requestPermission();
             for await (const [name, entry] of handle.entries()) {
+                if (name === ".DS_Store") continue;
                 if (entry.kind === "file") {
-                    files.push(name);
+                    const file = await entry.getFile();
+                    const window = await parseFile(file);
+                    entries.push(window);
                 }
             }
-            savedFiles = files.sort();
+            savedFiles = entries;
         }
     }
 
@@ -129,7 +133,10 @@
         <h2>Saved Files (DB)</h2>
         <div class="file-list">
             {#each savedFiles as file}
-                <div class="file-item">📄 {file}</div>
+                <div class="file-item">📄 {file.filename}</div>
+                {#each file.tabs as tab}
+                    <TabItem title={tab.title} url={tab.url} />
+                {/each}
             {/each}
         </div>
     </div>
