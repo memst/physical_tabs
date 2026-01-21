@@ -6,11 +6,13 @@
         type WorkspaceStorage,
         refreshWorkspaceStorage,
     } from "../lib/workspaceStorage";
+    import { getDirectoryHandle } from "../lib/db";
 
-    let windows: chrome.windows.Window[] = [];
+    let windows: chrome.windows.Window[] = $state([]);
     let workspaceListComp: WorkspaceList;
-    let showModal = false;
-    let importText = "";
+    let showModal = $state(false);
+    let importText = $state("");
+    let savedFiles: string[] = $state([]);
 
     // Cleanup inactive windows logic (ported from tabs.ts)
     async function cleanupInactiveWindows(): Promise<WorkspaceStorage> {
@@ -37,10 +39,26 @@
         return workspaces;
     }
 
+    async function loadFiles() {
+        const handle = await getDirectoryHandle();
+        if (handle) {
+            const files: string[] = [];
+            // @ts-ignore - TS might complain about async iterator on older dom libs
+            await handle.requestPermission();
+            for await (const [name, entry] of handle.entries()) {
+                if (entry.kind === "file") {
+                    files.push(name);
+                }
+            }
+            savedFiles = files.sort();
+        }
+    }
+
     async function refresh() {
         await cleanupInactiveWindows();
 
         refreshWorkspaceStorage();
+        loadFiles();
         windows = await chrome.windows.getAll({ populate: true });
         if (workspaceListComp) workspaceListComp.refresh();
     }
@@ -101,19 +119,29 @@
 <div class="container">
     <h2>
         Chrome Windows and Tabs
-        <button class="import-btn" on:click={openImportModal}
-            >Import Tabs</button
-        >
+        <button class="import-btn" onclick={openImportModal}>
+            Import Tabs
+        </button>
+        <button class="import-btn" onclick={loadFiles}>Load Files</button>
     </h2>
+
+    <div class="files-section">
+        <h2>Saved Files (DB)</h2>
+        <div class="file-list">
+            {#each savedFiles as file}
+                <div class="file-item">📄 {file}</div>
+            {/each}
+        </div>
+    </div>
 
     <WorkspaceList bind:this={workspaceListComp} onChange={refresh} />
 
     <WindowTabList {windows} onTabClick={focusTab} />
 
     {#if showModal}
-        <div class="modal" on:click|self={closeImportModal}>
+        <div class="modal" onclick={closeImportModal}>
             <div class="modal-content">
-                <span class="close" on:click={closeImportModal}>&times;</span>
+                <span class="close" onclick={closeImportModal}>&times;</span>
                 <h3 style="margin-top: 0;">Import List of Tabs</h3>
                 <p>Paste your list of URLs below:</p>
                 <textarea
@@ -123,7 +151,7 @@
                     placeholder="1. https://example.com&#10;2. https://google.com"
                 >
                 </textarea>
-                <button class="import-action-btn" on:click={importTabs}
+                <button class="import-action-btn" onclick={importTabs}
                     >Open in New Window</button
                 >
             </div>
@@ -142,6 +170,24 @@
         font-size: 0.6em;
         padding: 5px 10px;
         cursor: pointer;
+    }
+    .files-section {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f5f5f5;
+        border-radius: 5px;
+    }
+    .file-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .file-item {
+        background-color: white;
+        padding: 5px 10px;
+        border-radius: 3px;
+        border: 1px solid #ddd;
+        font-size: 0.9em;
     }
     /* Modal Styles */
     .modal {
