@@ -95,11 +95,11 @@
             🗑️ Delete
           </button>
         {/if}
-        <WindowTabList
-          windows={workspace.windows}
-          onTabClick={(windowId: number, tabId: number) => null}
-        />
       </div>
+      <WindowTabList
+        windows={workspace.windows}
+        onTabClick={(windowId: number, tabId: number) => null}
+      />
     </div>
   {/each}
 
