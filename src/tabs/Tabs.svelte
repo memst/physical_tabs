@@ -8,7 +8,11 @@
         refreshWorkspaceStorage,
     } from "../lib/workspaceStorage";
     import { getDirectoryHandle } from "../lib/db";
-    import { type SavedWindowFile, parseFile } from "../lib/windowFile";
+    import {
+        type SavedWindowFile,
+        parseFile,
+        compareSavedWindowFile,
+    } from "../lib/windowFile";
 
     let windows: chrome.windows.Window[] = $state([]);
     let workspaceListComp: WorkspaceList;
@@ -54,7 +58,7 @@
                     entries.push(window);
                 }
             }
-            savedFiles = entries;
+            savedFiles = entries.sort(compareSavedWindowFile);
         }
     }
 

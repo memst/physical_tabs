@@ -65,3 +65,7 @@ export async function parseFile(file: File): Promise<SavedWindowFile> {
         filename: file.name,
     };
 }
+
+export function compareSavedWindowFile(a: SavedWindowFile, b: SavedWindowFile): number {
+    return a.filename.localeCompare(b.filename);
+}
