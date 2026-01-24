@@ -4,38 +4,85 @@
 
     let { file }: { file: SavedWindowFile } = $props();
 
-    async function onRestore() {
+    // Initialize state from LocalStorage
+    let isCollapsed = $state(
+        JSON.parse(
+            localStorage.getItem("collapse_" + file.filename) || "false",
+        ),
+    );
+
+    function toggleCollapse() {
+        isCollapsed = !isCollapsed;
+        localStorage.setItem("collapse_" + file.filename, String(isCollapsed));
+    }
+
+    $effect(() => {
+        isCollapsed = JSON.parse(
+            localStorage.getItem("collapse_" + file.filename) || "false",
+        );
+    });
+
+    async function onRestore(e: MouseEvent) {
+        e.stopPropagation();
         await restoreAsWindow(file);
     }
 </script>
 
 <div class="window">
-    <div class="window-title">
-        <span>
-            {file.title || "Untitled Window"} ({file.tabs?.length || 0} tabs)
+    <div
+        class="window-title"
+        onclick={toggleCollapse}
+        role="button"
+        tabindex="0"
+        onkeydown={(e) => e.key === "Enter" && toggleCollapse()}
+    >
+        <span class="title-text">
+            <span class="arrow">{isCollapsed ? "▶" : "▼"}</span>
+            {file.title || "Window"} ({file.tabs?.length || 0} tabs)
             <span class="filename">{file.filename}</span>
         </span>
         <button onclick={onRestore} class="restore-btn">Restore</button>
     </div>
-    {#each file.tabs || [] as tab}
-        <TabItem title={tab.title} url={tab.url} />
-    {/each}
+    {#if !isCollapsed}
+        <div class="tabs-list">
+            {#each file.tabs || [] as tab}
+                <TabItem title={tab.title} url={tab.url} />
+            {/each}
+        </div>
+    {/if}
 </div>
 
 <style>
     .window {
         border: 1px solid #ccc;
-        margin-bottom: 20px;
-        padding: 10px;
+        margin-bottom: 8px;
+        padding: 5px 8px;
         border-radius: 5px;
         background-color: white;
     }
     .window-title {
         font-weight: bold;
-        margin-bottom: 10px;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        cursor: pointer;
+        user-select: none;
+    }
+    .title-text {
+        display: flex;
+        align-items: center;
+    }
+    .tabs-list {
+        margin-top: 5px;
+        border-top: 1px solid #eee;
+        padding-top: 5px;
+    }
+    /* .window-title styles replaced above */
+    .arrow {
+        display: inline-block;
+        width: 15px;
+        margin-right: 5px;
+        font-size: 0.8em;
     }
     .restore-btn {
         padding: 4px 8px;
