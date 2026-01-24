@@ -11,7 +11,10 @@
 
 <div class="window">
     <div class="window-title">
-        📄 {file.filename} ({file.tabs?.length || 0} tabs)
+        <span>
+            {file.title || "Untitled Window"} ({file.tabs?.length || 0} tabs)
+            <span class="filename">{file.filename}</span>
+        </span>
         <button onclick={onRestore} class="restore-btn">Restore</button>
     </div>
     {#each file.tabs || [] as tab}
@@ -45,5 +48,11 @@
     }
     .restore-btn:hover {
         background-color: #45a049;
+    }
+    .filename {
+        color: #888;
+        font-weight: normal;
+        margin-left: 8px;
+        font-size: 0.9em;
     }
 </style>

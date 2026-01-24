@@ -6,8 +6,9 @@ type SavedTabV3 = {
 export type SavedTab = SavedTabV3;
 
 type SavedWindowV3 = {
-    version?: string;
+    version: "3";
     tabs: SavedTab[];
+    title: string | null;
 }
 export type SavedWindow = SavedWindowV3;
 export type SavedWindowFile = SavedWindowV3 & {
@@ -15,28 +16,37 @@ export type SavedWindowFile = SavedWindowV3 & {
 }
 
 function parseV1_V2(json: any[]): SavedWindowV3 {
-    const tabs = json.map((el) => {
-        if (Array.isArray(el) && el.length === 2 && typeof el[1] === "string") {
-            return {
-                title: el[0],
-                url: el[1],
-            };
-        } else {
-            // Handle legacy format if needed, but existing code threw error for non-arrays-of-length-2 generally,
-            // except restore logic had stringent check.
-            throw new Error("Parsing V1 tab format is not supported.");
-        }
-    });
+    let tabs: SavedTab[];
+
+    const isStringArray = json.every(el => typeof el === 'string');
+    const isTupleArray = json.every(el => Array.isArray(el) && el.length === 2 && typeof el[1] === 'string');
+
+    if (isTupleArray) {
+        tabs = json.map(el => ({
+            title: el[0],
+            url: el[1]
+        }));
+    } else if (isStringArray) {
+        tabs = json.map(el => ({
+            title: "",
+            url: el
+        }));
+    } else {
+        throw new Error("Unknown file format.");
+    }
+
     return {
         version: "3",
         tabs,
+        title: null
     }
 }
 
-function of_V3(json: Record<string, any>): SavedWindowV3 {
+function parseV3(json: Record<string, any>): SavedWindowV3 {
     return {
         version: "3",
         tabs: json.tabs,
+        title: json.title || null
     }
 }
 
@@ -49,11 +59,11 @@ async function parseFileInternal(file: File): Promise<SavedWindow> {
         }
         const json2: Record<string, any> = json1;
         if (json2.version === "3") {
-            return of_V3(json2);
+            return parseV3(json2);
         }
         throw new Error("Unsupported file format");
     } catch (err: any) {
-        console.error("Error loading file: " + err.message);
+        console.error(`Error loading file ${file.name}: ` + err.message);
         throw err;
     }
 }
