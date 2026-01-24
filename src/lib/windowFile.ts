@@ -42,7 +42,6 @@ function of_V3(json: Record<string, any>): SavedWindowV3 {
 
 async function parseFileInternal(file: File): Promise<SavedWindow> {
     const text = await file.text();
-    console.log("File text: ", file.name, text);
     try {
         const json1 = JSON.parse(text);
         if (Array.isArray(json1)) {
@@ -54,8 +53,7 @@ async function parseFileInternal(file: File): Promise<SavedWindow> {
         }
         throw new Error("Unsupported file format");
     } catch (err: any) {
-        console.error("Error loading file: " + err.message, file, text);
-        // alert("Error loading file: " + err.message);
+        alert("Error loading file: " + err.message);
         throw err;
     }
 }

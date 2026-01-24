@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { getFavicon } from "./faviconCache";
+
     let {
         title,
         url,
@@ -10,10 +12,17 @@
         faviconUrl?: string;
         onClick?: () => void;
     } = $props();
+
+    let displayFavicon = $state<string | null>(null);
+    $effect(() => {
+        getFavicon(url, faviconUrl).then((favicon) => {
+            displayFavicon = favicon;
+        });
+    });
 </script>
 
 <div class="tab" onclick={onClick}>
-    <img src={faviconUrl || "chrome://favicon/"} alt="" />
+    <img src={displayFavicon} alt="" />
     <span class="tab-title">{title}</span>
     <span class="tab-url">{url}</span>
 </div>
