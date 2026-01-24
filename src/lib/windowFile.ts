@@ -53,7 +53,7 @@ async function parseFileInternal(file: File): Promise<SavedWindow> {
         }
         throw new Error("Unsupported file format");
     } catch (err: any) {
-        alert("Error loading file: " + err.message);
+        console.error("Error loading file: " + err.message);
         throw err;
     }
 }

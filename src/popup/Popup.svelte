@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { createWorkspace } from "../lib/workspaceStorage";
   import { getDirectoryHandle, saveDirectoryHandle } from "../lib/db";
+  import { parseFile } from "../lib/windowFile";
 
   let currentHandle: FileSystemDirectoryHandle | null = null;
   let folderStatus = "Folder: Not set";
@@ -178,18 +179,10 @@
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
 
-    const text = await file.text();
     try {
-      const urls = JSON.parse(text);
-      if (!Array.isArray(urls)) throw new Error("Invalid file format");
-      for (const el of urls) {
-        if (Array.isArray(el) && el.length === 2 && typeof el[1] === "string") {
-          chrome.tabs.create({ url: el[1] });
-        } else {
-          // Handle legacy format if needed, but existing code threw error for non-arrays-of-length-2 generally,
-          // except restore logic had stringent check.
-          throw new Error("Invalid tab format!");
-        }
+      const windowFile = await parseFile(file);
+      for (const tab of windowFile.tabs) {
+        chrome.tabs.create({ url: tab.url });
       }
     } catch (err: any) {
       alert("Error loading file: " + err.message);
