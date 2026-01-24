@@ -69,3 +69,8 @@ export async function parseFile(file: File): Promise<SavedWindowFile> {
 export function compareSavedWindowFile(a: SavedWindowFile, b: SavedWindowFile): number {
     return a.filename.localeCompare(b.filename);
 }
+
+export async function restoreAsWindow(windowFile: SavedWindowFile): Promise<chrome.windows.Window> {
+    const urls = windowFile.tabs.map(t => t.url);
+    return chrome.windows.create({ url: urls, focused: true });
+}
