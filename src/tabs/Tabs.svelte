@@ -130,6 +130,13 @@
         <button class="import-btn" onclick={openImportModal}>
             Import Tabs
         </button>
+        <button
+            class="import-btn"
+            onclick={() =>
+                chrome.tabs.create({ url: "../preferences/index.html" })}
+        >
+            ⚙️ Settings
+        </button>
         <button class="import-btn" onclick={loadFiles}>Load Files</button>
     </h2>
 

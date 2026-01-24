@@ -15,7 +15,8 @@ export default defineConfig({
             input: {
                 popup: 'src/popup/index.html',
                 tabs: 'src/tabs/index.html',
-                workspace: 'src/workspace/index.html'
+                workspace: 'src/workspace/index.html',
+                preferences: "src/preferences/index.html",
             }
         }
     }

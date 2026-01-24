@@ -235,6 +235,13 @@
 
 <div class="separator"></div>
 
+<button
+  on:click={() => chrome.tabs.create({ url: "src/preferences/index.html" })}
+  >⚙️ Settings</button
+>
+
+<div class="separator"></div>
+
 <button on:click={setFolder}>📁 Set Backup Folder</button>
 <div class="folder-status">{folderStatus}</div>
 
