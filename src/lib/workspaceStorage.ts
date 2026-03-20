@@ -19,7 +19,7 @@ export async function getWorkspaces(): Promise<WorkspaceStorage> {
 }
 
 function createWorkspaceId(): string {
-    return `ws_${crypto.randomUUID()}`;
+    return `ws_${new Date().toISOString().replace(/[:.]/g, '-')}`;
 }
 
 export async function createWorkspace() {
@@ -30,7 +30,7 @@ export async function createWorkspace() {
     const workspace: Workspace = {
         created,
         lastAccessed: created,
-        name: "New Workspace",
+        name: `Workspace ${workspaceId}`,
         workspaceId: workspaceId,
         windows: [],
     };
@@ -40,13 +40,12 @@ export async function createWorkspace() {
 }
 
 export async function getWindowWorkspace(window: chrome.windows.Window): Promise<[WorkspaceId, TabId] | null> {
-    const workspacePath = "/workspace/index.html";
     for (const tab of window.tabs || []) {
         if (!tab.pinned) break;
         if (!tab.url) continue;
 
         const url = new URL(tab.url);
-        if (url.pathname.endsWith(workspacePath)) {
+        if (url.pathname.endsWith('/workspace/index.html')) {
             const workspaceId = url.searchParams.get('id');
             if (workspaceId == null) {
                 if (tab.id != null) {
@@ -67,9 +66,16 @@ export async function refreshWorkspaceStorage(): Promise<WorkspaceStorage> {
     }
     const windows = await chrome.windows.getAll({ populate: true });
     for (const window of windows) {
-        const workspaceId = (await getWindowWorkspace(window))?.[0];
-        if (workspaceId && workspaces[workspaceId]) {
+        const workspaceReference = await getWindowWorkspace(window);
+        if (!workspaceReference) {
+            continue;
+        }
+
+        const [workspaceId, tabId] = workspaceReference;
+        if (workspaces[workspaceId]) {
             workspaces[workspaceId].windows.push(window);
+        } else {
+            await chrome.tabs.remove(tabId);
         }
     }
     await chrome.storage.local.set({ workspaces: workspaces });
