@@ -45,19 +45,21 @@
 </script>
 
 <div class="window">
-    <div class="window-header">
-        <button
-            type="button"
-            class="title-button"
-            onclick={toggleCollapse}
-            aria-expanded={!isCollapsed}
-        >
+    <div
+        class="window-header"
+        onclick={toggleCollapse}
+        role="button"
+        tabindex="0"
+        aria-expanded={!isCollapsed}
+        onkeydown={(e) => (e.key === "Enter" || e.key === " ") && toggleCollapse()}
+    >
+        <span class="title-button">
             <span class="title-text">
                 <span class="arrow">{isCollapsed ? "▶" : "▼"}</span>
                 {file.title || "Window"} ({file.tabs?.length || 0} tabs)
                 <span class="filename">{file.filename}</span>
             </span>
-        </button>
+        </span>
         <div class="actions">
             <button type="button" onclick={onAppend} class="append-btn">
                 Append
@@ -97,17 +99,11 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        cursor: pointer;
+        user-select: none;
     }
     .title-button {
         display: block;
-        padding: 0;
-        border: 0;
-        background: transparent;
-        color: inherit;
-        font: inherit;
-        cursor: pointer;
-        user-select: none;
-        text-align: left;
     }
     .tabs-list {
         margin-top: 5px;
