@@ -1,6 +1,7 @@
 import { openIndexedDB } from "./db";
 
-const FAVICON_STORE = "favicons";
+const FAVICON_STORE = 'favicons';
+
 
 function getDomain(url: string): string | null {
     try {
@@ -17,77 +18,64 @@ function tabFaviconUrl(tabUrl: string): string {
     return url.toString();
 }
 
-function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
+async function storeFavicon(db: IDBDatabase, domain: string, dataUrl: string): Promise<void> {
     return new Promise((resolve, reject) => {
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () =>
-            reject(request.error ?? new Error("IndexedDB request failed"));
+        const tx = db.transaction(FAVICON_STORE, "readwrite");
+        const store = tx.objectStore(FAVICON_STORE);
+        const req = store.put(dataUrl, domain);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
     });
 }
 
-async function cacheFaviconDataUrl(db: IDBDatabase, domain: string, dataUrl: string): Promise<void> {
-    const request = db.transaction(FAVICON_STORE, "readwrite").objectStore(FAVICON_STORE).put(dataUrl, domain);
-    await requestToPromise(request);
-}
-
-// These stay separate on purpose: `cacheFaviconDataUrl` only writes an already
-// normalized data URL into IndexedDB, while `resolveAndCacheFavicon` may fetch
-// or transcode a favicon before delegating to that lower-level cache write.
-async function resolveAndCacheFavicon(
-    db: IDBDatabase,
-    tabUrl: string,
-    faviconUrl?: string,
-): Promise<string | null> {
+async function saveFavicon(db: IDBDatabase, tabUrl: string, faviconUrl?: string): Promise<void> {
     const domain = getDomain(tabUrl);
-    if (!domain) return null;
+    if (!domain) return;
+
+    if (faviconUrl && faviconUrl.startsWith("data:")) {
+        await storeFavicon(db, domain, faviconUrl);
+        return;
+    }
 
     try {
-        if (faviconUrl && faviconUrl.startsWith("data:")) {
-            await cacheFaviconDataUrl(db, domain, faviconUrl);
-            return faviconUrl;
-        }
-
-        const sourceUrl = faviconUrl || tabFaviconUrl(tabUrl);
-        const faviconFetch = await fetch(sourceUrl);
-        if (!faviconFetch.ok) {
-            throw new Error(`Failed to fetch favicon: ${faviconFetch.status}`);
-        }
+        const faviconFetch = await fetch(tabFaviconUrl(tabUrl));
         const blob = await faviconFetch.blob();
 
-        const dataUrl = await new Promise<string>((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
+            reader.onloadend = async () => {
+                const result = reader.result as string;
+                await storeFavicon(db, domain, result);
+                resolve();
+            };
             reader.onerror = () => reject(reader.error);
             reader.readAsDataURL(blob);
         });
-        await cacheFaviconDataUrl(db, domain, dataUrl);
-        return dataUrl;
     } catch (e) {
         console.warn("Failed to fetch/save favicon for", domain, e);
-        return null;
     }
 }
 
 function getFaviconInternal(db: IDBDatabase, domain: string): Promise<string | null> {
     const faviconRequest = db.transaction(FAVICON_STORE, "readonly").objectStore(FAVICON_STORE).get(domain);
-    return requestToPromise<string | undefined>(faviconRequest)
-        .then((result) => result ?? null)
-        .catch(() => null);
+    return new Promise<string | null>((resolve, reject) => {
+        faviconRequest.onsuccess = () => resolve(faviconRequest.result as string || null);
+        faviconRequest.onerror = () => resolve(null);
+    });
 }
 
 export async function getFavicon(tabUrl: string, faviconUrl?: string): Promise<string | null> {
+    // TODO: This getFavicon function is slightly buggy because it will
+    // prioritize the cached favicon for the domain no matter what. A better
+    // solution would be to prioritize faviconUrl and force-update the cache if
+    // it is different.
     const domain = getDomain(tabUrl);
     if (!domain) return null;
 
     const db = await openIndexedDB();
-    const preferredFavicon = await resolveAndCacheFavicon(db, tabUrl, faviconUrl);
-    if (preferredFavicon) return preferredFavicon;
+    const favicon = await getFaviconInternal(db, domain);
+    if (favicon) return favicon;
 
-    const cachedFavicon = await getFaviconInternal(db, domain);
-    if (cachedFavicon) return cachedFavicon;
-
-    const fetchedFavicon = await resolveAndCacheFavicon(db, tabUrl);
-    if (fetchedFavicon) return fetchedFavicon;
-
+    await saveFavicon(db, tabUrl, faviconUrl);
     return getFaviconInternal(db, domain);
 }
