@@ -21,7 +21,8 @@
         }));
 
         await saveTabs(tabsForSaver, {
-            filename: window.id !== undefined ? `window_${window.id}` : "window",
+            filename:
+                window.id !== undefined ? `window_${window.id}` : "window",
             closeTabs: false,
         });
     }
@@ -32,18 +33,16 @@
         <span>Window {window.id} ({window.tabs?.length || 0} tabs)</span>
         <button type="button" onclick={onSave} class="save-btn">Save</button>
     </div>
-    {#each window.tabs || [] as tab (tab.id ?? tab.url ?? tab.title)}
+    {#each window.tabs || [] as tab}
         <TabItem
             title={tab.title!}
             url={tab.url!}
             faviconUrl={tab.favIconUrl}
-            onClick={
-                window.id !== undefined &&
-                tab.id !== undefined &&
-                onTabClick
-                    ? () => onTabClick(window.id!, tab.id!)
-                    : undefined
-            }
+            onClick={window.id !== undefined &&
+            tab.id !== undefined &&
+            onTabClick
+                ? () => onTabClick(window.id!, tab.id!)
+                : undefined}
         />
     {/each}
 </div>
