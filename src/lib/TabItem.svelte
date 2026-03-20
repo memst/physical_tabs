@@ -55,11 +55,11 @@
         width: 100%;
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 8px 10px;
+        padding: 5px;
         border: 0;
         background: transparent;
         color: inherit;
+        font: inherit;
         cursor: pointer;
         border-bottom: 1px solid #eee;
         text-align: left;
@@ -75,16 +75,17 @@
         width: 16px;
         height: 16px;
         flex: 0 0 auto;
+        margin-right: 10px;
     }
     .tab-copy {
         display: flex;
         min-width: 0;
         align-items: center;
-        gap: 10px;
         flex: 1;
     }
     .tab-title {
         font-weight: bold;
+        margin-right: 10px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
