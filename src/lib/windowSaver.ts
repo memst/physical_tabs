@@ -1,26 +1,84 @@
-import { saveDirectoryHandle, getDirectoryHandle } from "./db";
+import { getDirectoryHandle } from "./db";
+import type { SavedWindowFile } from "./windowFile";
+
+type TabSnapshot = {
+    title?: string;
+    url?: string;
+    id?: number;
+};
+
+function isExtensionTab(tab: TabSnapshot): boolean {
+    return tab.url?.startsWith(`chrome-extension://${chrome.runtime.id}`) ?? false;
+}
+
+function toSavedTabs(tabs: TabSnapshot[]): string[][] {
+    return tabs
+        .filter((tab): tab is TabSnapshot & { url: string } => {
+            return typeof tab.url === "string" && !isExtensionTab(tab);
+        })
+        .map((tab) => [tab.title ?? "", tab.url]);
+}
+
+function getClosableTabIds(tabs: TabSnapshot[]): number[] {
+    return tabs
+        .filter(
+            (tab): tab is TabSnapshot & { url: string; id: number } =>
+                typeof tab.url === "string" &&
+                !isExtensionTab(tab) &&
+                typeof tab.id === "number",
+        )
+        .map((tab) => tab.id);
+}
+
+function normalizeFilename(filename?: string): string {
+    const baseName = filename || `tabs_${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    return baseName.endsWith(".json") ? baseName : `${baseName}.json`;
+}
+
+async function hasReadWritePermission(handle: FileSystemDirectoryHandle): Promise<boolean> {
+    const options: FileSystemHandlePermissionDescriptor = {
+        mode: "readwrite",
+    };
+
+    if ((await handle.queryPermission(options)) === "granted") return true;
+    if ((await handle.requestPermission(options)) === "granted") return true;
+    return false;
+}
+
+async function writeJsonFile(
+    handle: FileSystemDirectoryHandle,
+    filename: string,
+    content: string,
+): Promise<void> {
+    const fileHandle = await handle.getFileHandle(filename, {
+        create: true,
+    });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+}
+
+async function closeTabs(tabs: TabSnapshot[]): Promise<void> {
+    const ids = getClosableTabIds(tabs);
+    if (ids.length > 0) {
+        await chrome.tabs.remove(ids);
+    }
+}
 
 export async function saveTabs(
-    tabs: { title?: string, url?: string, id?: number }[],
+    tabs: TabSnapshot[],
     options: {
-        filename?: string,
-        additionalTabs?: string[][],
-        closeTabs?: boolean,
-        handle?: FileSystemDirectoryHandle | null
-    } = {}
+        filename?: string;
+        additionalTabs?: string[][];
+        closeTabs?: boolean;
+        handle?: FileSystemDirectoryHandle | null;
+    } = {},
 ): Promise<void> {
-    console.log("Saving window...");
-
-    // Filter out our extension tabs
-    const extensionId = chrome.runtime.id;
-    const active_tabs = tabs.filter(
-        (tab) => !tab.url?.startsWith(`chrome-extension://${extensionId}`),
-    );
-
-    const new_tabs = active_tabs.map((tab) => [tab.title || "", tab.url!]);
-    const final_tabs =
-        options.additionalTabs?.concat(new_tabs as string[][]) || new_tabs;
-    const jsonContent = JSON.stringify(final_tabs, null, 2);
+    const savedTabs = toSavedTabs(tabs);
+    const finalTabs = [...(options.additionalTabs ?? []), ...savedTabs];
+    const jsonContent = JSON.stringify(finalTabs, null, 2);
+    const closeTabsRequested = options.closeTabs ?? false;
+    const tabsToClose = closeTabsRequested ? tabs : [];
 
     let handle = options.handle;
     if (!handle) {
@@ -29,126 +87,61 @@ export async function saveTabs(
 
     if (handle) {
         try {
-            const verifyPermission = async (handle: FileSystemDirectoryHandle) => {
-                const opts: FileSystemHandlePermissionDescriptor = {
-                    mode: "readwrite",
-                };
-                if ((await handle.queryPermission(opts)) === "granted")
-                    return true;
-                if ((await handle.requestPermission(opts)) === "granted")
-                    return true;
-                return false;
-            };
-
-            if (await verifyPermission(handle)) {
-                const name =
-                    options.filename ||
-                    `tabs_${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-                const finalName = name.endsWith(".json") ? name : `${name}.json`;
-
-                const fileHandle = await handle.getFileHandle(finalName, {
-                    create: true,
-                });
-                const writable = await fileHandle.createWritable();
-                await writable.write(jsonContent);
-                await writable.close();
-
-                if (options.closeTabs) {
-                    const idsToRemove = active_tabs.map(t => t.id).filter((id): id is number => id !== undefined);
-                    if (idsToRemove.length > 0) {
-                        chrome.tabs.remove(idsToRemove);
-                    }
-                }
+            if (await hasReadWritePermission(handle)) {
+                await writeJsonFile(handle, normalizeFilename(options.filename), jsonContent);
+                await closeTabs(tabsToClose);
                 return;
             }
         } catch (err) {
             console.error("Failed to save to folder:", err);
-            // Fallthrough to download
         }
     }
 
-    // Fallback to download
     const blob = new Blob([jsonContent], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
     chrome.downloads.download(
         {
             url,
-            filename: options.filename || "tabs.json",
+            filename: normalizeFilename(options.filename),
             saveAs: true,
         },
         (downloadId) => {
             if (chrome.runtime.lastError) {
                 console.error("Download failed: " + chrome.runtime.lastError.message);
+                URL.revokeObjectURL(url);
                 return;
             }
-            // Monitor download to close tabs
+
             if (options.closeTabs) {
                 const onChanged = ({ id, state }: chrome.downloads.DownloadDelta) => {
-                    if (id === downloadId && state && state.current === "complete") {
+                    if (id === downloadId && state?.current === "complete") {
                         chrome.downloads.onChanged.removeListener(onChanged);
-                        const idsToRemove = active_tabs.map(t => t.id).filter((id): id is number => id !== undefined);
-                        if (idsToRemove.length > 0) {
-                            chrome.tabs.remove(idsToRemove);
-                        }
+                        URL.revokeObjectURL(url);
+                        void closeTabs(tabsToClose);
                     }
                 };
                 chrome.downloads.onChanged.addListener(onChanged);
+            } else {
+                URL.revokeObjectURL(url);
             }
         },
     );
 }
 
-import type { SavedWindowFile } from "./windowFile";
-
 export async function appendTabsToFile(file: SavedWindowFile): Promise<void> {
     const currentWindow = await chrome.tabs.query({ currentWindow: true });
 
-    // Normalize current tabs to string array format [title, url] for compatibility with saveTabs 'additionalTabs' option
-    // Wait, saveTabs handles 'additionalTabs' as string[][].
-    // But we want to merge into the SavedWindowFile structure.
-
-    // Actually, saveTabs overwrites. So we should construct the new full list of tabs.
-    // The current saveTabs takes `tabs` (SavedTab-like) and `additionalTabs` (string[][]).
-
-    // Let's reuse saveTabs but be smart about it.
-    // 1. Existing tabs from file.
-    // 2. New tabs from current window.
-
-    // Re-map existing file tabs to the saveTabs input format
-    const existingTabs = file.tabs.map(t => ({
-        title: t.title,
-        url: t.url
-    }));
-
-    // Current window tabs
-    const newTabs = currentWindow.map(t => ({
-        title: t.title || "",
-        url: t.url || "",
-        id: t.id
-    }));
-
-    // We can just pass `newTabs` as the primary tabs to saveTabs, 
-    // and pass existing tabs as `additionalTabs`? 
-    // saveTabs filters specific extension URLs from the main list. 
-    // It blindly concatenates `additionalTabs`.
-
-    // So if we assume the file content is already clean, we can convert it to string[][] and pass as additionalTabs.
-    const additionalTabs = existingTabs.map(t => [t.title, t.url]);
-
-    await saveTabs(newTabs, {
-        filename: file.filename,
-        additionalTabs: additionalTabs,
-        closeTabs: false // Usually appending doesn't verify deletion of source tabs, but popup append DOES close.
-        // User requested "similar to popup". Popup append closes tabs?
-        // Let's check Popup.svelte logic.
-    });
-
-    // Wait, Popup.svelte append logic:
-    // 220:     await saveCurrentWindow(old_tabs, file.name);
-    // saveCurrentWindow calls saveTabs with closeTabs: true.
-    // So yes, we should probably close them or make it optional.
-    // For a dashboard button "Append this window to that file", typically you might expect it to just add them.
-    // But if it's "Move these tabs to storage", closing is expected.
-    // I'll make it NOT close tabs by default for the dashboard because it's less destructive/alarming.
+    await saveTabs(
+        currentWindow.map((tab) => ({
+            title: tab.title,
+            url: tab.url,
+            id: tab.id,
+        })),
+        {
+            filename: file.filename,
+            additionalTabs: file.tabs.map((tab) => [tab.title, tab.url]),
+            closeTabs: false,
+        },
+    );
 }

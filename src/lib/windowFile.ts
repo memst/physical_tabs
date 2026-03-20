@@ -15,39 +15,61 @@ export type SavedWindowFile = SavedWindowV3 & {
     filename: string;
 }
 
-function parseV1_V2(json: any[]): SavedWindowV3 {
-    let tabs: SavedTab[];
-
-    const isStringArray = json.every(el => typeof el === 'string');
-    const isTupleArray = json.every(el => Array.isArray(el) && el.length === 2 && typeof el[1] === 'string');
-
-    if (isTupleArray) {
-        tabs = json.map(el => ({
-            title: el[0],
-            url: el[1]
-        }));
-    } else if (isStringArray) {
-        tabs = json.map(el => ({
-            title: "",
-            url: el
-        }));
-    } else {
-        throw new Error("Unknown file format.");
+function parseV1_V2(json: unknown[]): SavedWindowV3 {
+    if (json.every((el) => typeof el === "string")) {
+        return {
+            version: "3",
+            tabs: json.map((url) => ({
+                title: "",
+                url,
+            })),
+            title: null,
+        };
     }
 
-    return {
-        version: "3",
-        tabs,
-        title: null
+    if (
+        json.every(
+            (el): el is [unknown, string] =>
+                Array.isArray(el) && el.length === 2 && typeof el[1] === "string",
+        )
+    ) {
+        return {
+            version: "3",
+            tabs: json.map((el) => ({
+                title: typeof el[0] === "string" ? el[0] : "",
+                url: el[1],
+            })),
+            title: null,
+        };
     }
+
+    throw new Error("Unknown file format.");
 }
 
-function parseV3(json: Record<string, any>): SavedWindowV3 {
+function parseV3(json: Record<string, unknown>): SavedWindowV3 {
+    if (!Array.isArray(json.tabs)) {
+        throw new Error("Unsupported file format");
+    }
+
     return {
         version: "3",
-        tabs: json.tabs,
-        title: json.title || null
-    }
+        tabs: json.tabs.map((tab) => {
+            if (typeof tab !== "object" || tab === null || !("url" in tab)) {
+                throw new Error("Unsupported file format");
+            }
+
+            const typedTab = tab as Record<string, unknown>;
+            if (typeof typedTab.url !== "string") {
+                throw new Error("Unsupported file format");
+            }
+
+            return {
+                title: typeof typedTab.title === "string" ? typedTab.title : "",
+                url: typedTab.url,
+            };
+        }),
+        title: typeof json.title === "string" ? json.title : null,
+    };
 }
 
 async function parseFileInternal(file: File): Promise<SavedWindow> {
@@ -57,13 +79,14 @@ async function parseFileInternal(file: File): Promise<SavedWindow> {
         if (Array.isArray(json1)) {
             return parseV1_V2(json1);
         }
-        const json2: Record<string, any> = json1;
+        const json2 = json1 as Record<string, unknown>;
         if (json2.version === "3") {
             return parseV3(json2);
         }
         throw new Error("Unsupported file format");
-    } catch (err: any) {
-        console.error(`Error loading file ${file.name}: ` + err.message);
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`Error loading file ${file.name}: ${message}`);
         throw err;
     }
 }
@@ -91,10 +114,14 @@ export function serialize(window: SavedWindow): string {
 
 export function createSavedWindowFromChromeWindow(window: chrome.windows.Window): SavedWindow {
     const tabs: SavedTab[] = (window.tabs || [])
-        .filter(t => t.url && !t.url.startsWith(`chrome-extension://${chrome.runtime.id}`))
-        .map(t => ({
-            title: t.title || "",
-            url: t.url!
+        .filter(
+            (tab): tab is chrome.tabs.Tab & { url: string } =>
+                typeof tab.url === "string" &&
+                !tab.url.startsWith(`chrome-extension://${chrome.runtime.id}`),
+        )
+        .map((tab) => ({
+            title: typeof tab.title === "string" ? tab.title : "",
+            url: tab.url,
         }));
 
     return {

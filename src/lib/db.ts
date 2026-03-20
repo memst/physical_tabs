@@ -1,29 +1,42 @@
-const DB_NAME = 'TabManagerDB';
-const DIRECTORY_STORE = 'config';
+const DB_NAME = "TabManagerDB";
+const DIRECTORY_STORE = "config";
+const DIRECTORY_HANDLE_KEY = "directoryHandle";
+const FAVICON_STORE = "favicons";
 
-export async function getDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
-    const db = await openIndexedDB();
-    const transaction = db.transaction([DIRECTORY_STORE], "readonly");
-    const store = transaction.objectStore(DIRECTORY_STORE);
-    const getRequest = store.get('directoryHandle');
+function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
     return new Promise((resolve, reject) => {
-
-        getRequest.onerror = () => reject(getRequest.error);
-        getRequest.onsuccess = () => {
-            resolve(getRequest.result as FileSystemDirectoryHandle || null);
-        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () =>
+            reject(request.error ?? new Error("IndexedDB request failed"));
     });
 }
 
-export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<void> {
+async function getStoreValue<T>(
+    storeName: string,
+    key: IDBValidKey,
+): Promise<T | null> {
     const db = await openIndexedDB();
-    const transaction = db.transaction([DIRECTORY_STORE], "readwrite");
-    const store = transaction.objectStore(DIRECTORY_STORE);
-    const putRequest = store.put(handle, 'directoryHandle');
-    return new Promise((resolve, reject) => {
-        putRequest.onerror = () => reject(putRequest.error);
-        putRequest.onsuccess = () => resolve();
-    })
+    const request = db.transaction(storeName, "readonly").objectStore(storeName).get(key);
+    const value = await requestToPromise<T | undefined>(request);
+    return value ?? null;
+}
+
+async function setStoreValue<T>(
+    storeName: string,
+    key: IDBValidKey,
+    value: T,
+): Promise<void> {
+    const db = await openIndexedDB();
+    const request = db.transaction(storeName, "readwrite").objectStore(storeName).put(value, key);
+    await requestToPromise(request);
+}
+
+export async function getDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
+    return getStoreValue<FileSystemDirectoryHandle>(DIRECTORY_STORE, DIRECTORY_HANDLE_KEY);
+}
+
+export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<void> {
+    await setStoreValue(DIRECTORY_STORE, DIRECTORY_HANDLE_KEY, handle);
 }
 
 export async function deleteFile(filename: string): Promise<void> {
@@ -40,9 +53,8 @@ export function openIndexedDB(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains(DIRECTORY_STORE)) {
             db.createObjectStore(DIRECTORY_STORE);
         }
-        // Add favicons store
-        if (!db.objectStoreNames.contains('favicons')) {
-            db.createObjectStore('favicons');
+        if (!db.objectStoreNames.contains(FAVICON_STORE)) {
+            db.createObjectStore(FAVICON_STORE);
         }
     };
     return new Promise((resolve, reject) => {
