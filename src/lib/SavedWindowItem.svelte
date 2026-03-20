@@ -88,9 +88,9 @@
 <style>
     .window {
         border: 1px solid #ccc;
-        margin-bottom: 10px;
-        padding: 10px 12px;
-        border-radius: 8px;
+        margin-bottom: 8px;
+        padding: 5px 8px;
+        border-radius: 5px;
         background-color: white;
     }
     .window-header {
@@ -102,7 +102,7 @@
     .title-button {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 0;
         padding: 0;
         border: 0;
         background: transparent;
@@ -112,17 +112,18 @@
         text-align: left;
     }
     .tabs-list {
-        margin-top: 10px;
+        margin-top: 5px;
         border-top: 1px solid #eee;
-        padding-top: 8px;
+        padding-top: 5px;
     }
     .arrow {
         display: inline-block;
         width: 15px;
+        margin-right: 5px;
         font-size: 0.8em;
     }
     .restore-btn {
-        padding: 5px 10px;
+        padding: 4px 8px;
         background-color: #4caf50;
         color: white;
         border: none;
@@ -136,12 +137,13 @@
     .filename {
         color: #888;
         font-weight: normal;
+        margin-left: 8px;
         font-size: 0.9em;
     }
     .title-text {
         display: flex;
         align-items: baseline;
-        gap: 8px;
+        gap: 0;
         flex-wrap: wrap;
     }
     .window-name {
@@ -154,11 +156,10 @@
     .actions {
         display: flex;
         gap: 8px;
-        flex-wrap: wrap;
         justify-content: flex-end;
     }
     .restore-del-btn {
-        padding: 5px 10px;
+        padding: 4px 8px;
         background-color: #d32f2f;
         color: white;
         border: none;
@@ -170,7 +171,7 @@
         background-color: #b71c1c;
     }
     .append-btn {
-        padding: 5px 10px;
+        padding: 4px 8px;
         background-color: #ff9800;
         color: white;
         border: none;
