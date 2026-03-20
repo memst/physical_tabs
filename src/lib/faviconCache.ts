@@ -76,18 +76,17 @@ function getFaviconInternal(db: IDBDatabase, domain: string): Promise<string | n
 }
 
 export async function getFavicon(tabUrl: string, faviconUrl?: string): Promise<string | null> {
+    // TODO: This getFavicon function is slightly buggy because it will
+    // prioritize the cached favicon for the domain no matter what. A better
+    // solution would be to prioritize faviconUrl and force-update the cache if
+    // it is different.
     const domain = getDomain(tabUrl);
     if (!domain) return null;
 
     const db = await openIndexedDB();
-    const preferredFavicon = await resolveAndCacheFavicon(db, tabUrl, faviconUrl);
-    if (preferredFavicon) return preferredFavicon;
+    const favicon = await getFaviconInternal(db, domain);
+    if (favicon) return favicon;
 
-    const cachedFavicon = await getFaviconInternal(db, domain);
-    if (cachedFavicon) return cachedFavicon;
-
-    const fetchedFavicon = await resolveAndCacheFavicon(db, tabUrl);
-    if (fetchedFavicon) return fetchedFavicon;
-
+    await saveFavicon(db, tabUrl, faviconUrl);
     return getFaviconInternal(db, domain);
 }
