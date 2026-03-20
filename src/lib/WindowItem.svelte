@@ -21,8 +21,6 @@
         }));
 
         await saveTabs(tabsForSaver, {
-            filename:
-                window.id !== undefined ? `window_${window.id}` : "window",
             closeTabs: false,
         });
     }
