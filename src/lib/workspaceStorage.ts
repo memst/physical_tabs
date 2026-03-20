@@ -18,13 +18,13 @@ export async function getWorkspaces(): Promise<WorkspaceStorage> {
     return result.workspaces || {};
 }
 
-function createWorkspaceId(): string {
-    return `ws_${new Date().toISOString().replace(/[:.]/g, '-')}`;
+function createWorkspaceId(created: number): string {
+    return `ws_${new Date(created).toISOString().replace(/[:.]/g, '-')}`;
 }
 
 export async function createWorkspace() {
     const created = Date.now();
-    const workspaceId = createWorkspaceId();
+    const workspaceId = createWorkspaceId(created);
     const workspaces = await getWorkspaces();
 
     const workspace: Workspace = {
