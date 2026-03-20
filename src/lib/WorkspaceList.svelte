@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
+    getWorkspaces,
     getWindowWorkspace,
     deleteEmptyWorkspaces,
     removeWindowFromWorkspace,
@@ -9,10 +10,14 @@
   } from "./workspaceStorage";
   import WindowTabList from "./WindowTabList.svelte";
 
-  export let onChange: () => Promise<void>;
+  let {
+    onChange,
+  }: {
+    onChange: () => Promise<void>;
+  } = $props();
 
-  let workspaces: WorkspaceStorage = {};
-  let emptyCount = 0;
+  let workspaces = $state<WorkspaceStorage>({});
+  let emptyCount = $state(0);
 
   export async function refresh() {
     workspaces = await refreshWorkspaceStorage();
@@ -22,14 +27,15 @@
   }
 
   onMount(() => {
-    refresh();
+    void refresh();
   });
 
   async function deleteWorkspace(workspaceId: string) {
-    const result = await chrome.storage.local.get("workspaces");
-    const ws = result.workspaces || {};
-    delete ws[workspaceId];
-    await chrome.storage.local.set({ workspaces: ws });
+    const workspaces = await getWorkspaces();
+    if (!workspaces[workspaceId]) return;
+
+    delete workspaces[workspaceId];
+    await chrome.storage.local.set({ workspaces });
     await onChange();
   }
 
@@ -52,8 +58,7 @@
           index: 0,
         });
       }
-      // Give chrome a moment to update tab before refreshing might be nice, but onChange handles standard flow
-      // Adding a delay might ensure the tab is fully created/updated if we rely on window listings immediately
+      await onChange();
     } catch (err) {
       console.error("Failed to add current window to workspace", err);
     }
@@ -81,16 +86,18 @@
         </span>
 
         <button
+          type="button"
           class="add-workspace-window"
-          on:click={() => addToWorkspace(workspaceId)}
+          onclick={() => addToWorkspace(workspaceId)}
         >
           ➕ Add current window
         </button>
 
-        {#if workspace.windows.length === 0}
+        {#if workspace.windows?.length === 0}
           <button
+            type="button"
             class="delete-workspace"
-            on:click={() => deleteWorkspace(workspaceId)}
+            onclick={() => deleteWorkspace(workspaceId)}
           >
             🗑️ Delete
           </button>
@@ -98,14 +105,14 @@
       </div>
       <WindowTabList
         windows={workspace.windows}
-        onTabClick={(windowId: number, tabId: number) => null}
+        title="Workspace Windows"
       />
     </div>
   {/each}
 
   {#if emptyCount > 0}
     <div style="margin-top: 12px;">
-      <button class="delete-empty-workspaces" on:click={purgeEmpty}>
+      <button type="button" class="delete-empty-workspaces" onclick={purgeEmpty}>
         🧹 Delete {emptyCount} empty workspace{emptyCount > 1 ? "s" : ""}
       </button>
     </div>
@@ -115,21 +122,22 @@
 <style>
   .workspaces-section {
     margin-bottom: 20px;
-    padding: 10px;
+    padding: 12px;
     background-color: #f5f5f5;
-    border-radius: 5px;
+    border-radius: 8px;
   }
   .workspace-item {
     background-color: white;
-    padding: 10px;
+    padding: 12px;
     margin-bottom: 10px;
-    border-radius: 4px;
+    border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
   .workspace-header {
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
   }
   .workspace-title {
     font-weight: bold;
@@ -138,7 +146,7 @@
   .workspace-details {
     color: #666;
     font-size: 0.9em;
-    flex-grow: 1;
+    flex: 1 1 100%;
   }
   button {
     padding: 5px 10px;
