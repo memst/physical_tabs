@@ -26,6 +26,12 @@ export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle): Pr
     })
 }
 
+export async function deleteFile(filename: string): Promise<void> {
+    const handle = await getDirectoryHandle();
+    if (!handle) throw new Error("No directory handle");
+    await handle.removeEntry(filename);
+}
+
 
 export function openIndexedDB(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, 2);

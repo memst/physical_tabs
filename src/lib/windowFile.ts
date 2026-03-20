@@ -84,3 +84,22 @@ export async function restoreAsWindow(windowFile: SavedWindowFile): Promise<chro
     const urls = windowFile.tabs.map(t => t.url);
     return chrome.windows.create({ url: urls, focused: true });
 }
+
+export function serialize(window: SavedWindow): string {
+    return JSON.stringify(window, null, 2);
+}
+
+export function createSavedWindowFromChromeWindow(window: chrome.windows.Window): SavedWindow {
+    const tabs: SavedTab[] = (window.tabs || [])
+        .filter(t => t.url && !t.url.startsWith(`chrome-extension://${chrome.runtime.id}`))
+        .map(t => ({
+            title: t.title || "",
+            url: t.url!
+        }));
+
+    return {
+        version: "3",
+        tabs,
+        title: null
+    };
+}

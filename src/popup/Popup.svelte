@@ -3,6 +3,7 @@
   import { createWorkspace } from "../lib/workspaceStorage";
   import { getDirectoryHandle, saveDirectoryHandle } from "../lib/db";
   import { parseFile } from "../lib/windowFile";
+  import { saveTabs } from "../lib/windowSaver";
 
   let currentHandle: FileSystemDirectoryHandle | null = null;
   let folderStatus = "Folder: Not set";
@@ -38,83 +39,31 @@
     additionalTabs?: string[][],
     filename?: string,
   ) {
-    console.log("Saving current window");
     const tabs = await chrome.tabs.query({ currentWindow: true });
-    // Filter out our extension tabs
-    const tabs_to_save = tabs.filter(
-      (tab) => !tab.url?.startsWith(`chrome-extension://${chrome.runtime.id}`),
-    );
-    const new_tabs = tabs_to_save.map((tab) => [tab.title || "", tab.url!]);
-    const final_tabs =
-      additionalTabs?.concat(new_tabs as string[][]) || new_tabs;
-    const jsonContent = JSON.stringify(final_tabs, null, 2);
 
-    if (currentHandle) {
-      try {
-        const verifyPermission = async (handle: FileSystemDirectoryHandle) => {
-          const options: FileSystemHandlePermissionDescriptor = {
-            mode: "readwrite",
-          };
-          if ((await handle.queryPermission(options)) === "granted")
-            return true;
-          if ((await handle.requestPermission(options)) === "granted")
-            return true;
-          return false;
-        };
+    // Transform tabs for saveTabs format if needed, but saveTabs handles chrome.tabs.Tab[]
+    // However, additionalTabs are string[][]. We need to normalize.
 
-        if (await verifyPermission(currentHandle)) {
-          const name =
-            filename ||
-            `tabs_${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-          const finalName = name.endsWith(".json") ? name : `${name}.json`;
+    const tabsForSaver = tabs.map((t) => ({
+      title: t.title,
+      url: t.url,
+      id: t.id,
+    }));
 
-          const fileHandle = await currentHandle.getFileHandle(finalName, {
-            create: true,
-          });
-          const writable = await fileHandle.createWritable();
-          await writable.write(jsonContent);
-          await writable.close();
+    const originalText = saveButtonText;
+    saveButtonText = "Saving...";
 
-          const originalText = saveButtonText;
-          saveButtonText = "Saved!";
-          setTimeout(() => {
-            saveButtonText = originalText;
-          }, 1500);
+    await saveTabs(tabsForSaver, {
+      filename,
+      additionalTabs,
+      closeTabs: true, // Popup behavior is to close tabs after save
+      handle: currentHandle,
+    });
 
-          chrome.tabs.remove(tabs_to_save.map((tab) => tab.id!));
-          return;
-        }
-      } catch (err) {
-        console.error("Failed to save to folder:", err);
-        alert("Failed to save to folder. Falling back to download.");
-      }
-    }
-
-    // Fallback to download
-    const blob = new Blob([jsonContent], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-
-    chrome.downloads.download(
-      {
-        url,
-        filename: filename || "tabs.json",
-        saveAs: true,
-      },
-      (downloadId) => {
-        if (chrome.runtime.lastError) {
-          alert("Download failed: " + chrome.runtime.lastError.message);
-          return;
-        }
-        // Monitor download to close tabs
-        const onChanged = ({ id, state }: chrome.downloads.DownloadDelta) => {
-          if (id === downloadId && state && state.current === "complete") {
-            chrome.downloads.onChanged.removeListener(onChanged);
-            chrome.tabs.remove(tabs_to_save.map((tab) => tab.id!));
-          }
-        };
-        chrome.downloads.onChanged.addListener(onChanged);
-      },
-    );
+    saveButtonText = "Saved!";
+    setTimeout(() => {
+      saveButtonText = originalText;
+    }, 1500);
   }
 
   async function handleSave() {

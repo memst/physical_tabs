@@ -7,7 +7,7 @@
         type WorkspaceStorage,
         refreshWorkspaceStorage,
     } from "../lib/workspaceStorage";
-    import { getDirectoryHandle } from "../lib/db";
+    import { getDirectoryHandle, deleteFile } from "../lib/db";
     import {
         type SavedWindowFile,
         parseFile,
@@ -122,6 +122,12 @@
             alert("No valid URLs found!");
         }
     }
+
+    function handleDelete(filename: string) {
+        deleteFile(filename)
+            .then(loadFiles)
+            .catch((err) => alert("Failed to delete file: " + err.message));
+    }
 </script>
 
 <div class="container">
@@ -133,7 +139,7 @@
         <button
             class="import-btn"
             onclick={() =>
-                chrome.tabs.create({ url: "../preferences/index.html" })}
+                chrome.tabs.create({ url: "src/preferences/index.html" })}
         >
             ⚙️ Settings
         </button>
@@ -144,7 +150,10 @@
         <h2>Saved Files (DB)</h2>
         <div class="file-list">
             {#each savedFiles as file}
-                <SavedWindowItem {file} />
+                <SavedWindowItem
+                    {file}
+                    onDelete={() => handleDelete(file.filename)}
+                />
             {/each}
         </div>
     </div>
