@@ -87,6 +87,6 @@ export async function getFavicon(tabUrl: string, faviconUrl?: string): Promise<s
     const favicon = await getFaviconInternal(db, domain);
     if (favicon) return favicon;
 
-    await saveFavicon(db, tabUrl, faviconUrl);
+    await resolveAndCacheFavicon(db, tabUrl, faviconUrl);
     return getFaviconInternal(db, domain);
 }
