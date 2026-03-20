@@ -52,10 +52,9 @@
             onclick={toggleCollapse}
             aria-expanded={!isCollapsed}
         >
-            <span class="arrow">{isCollapsed ? "▶" : "▼"}</span>
             <span class="title-text">
-                <span class="window-name">{file.title || "Window"}</span>
-                <span class="tab-count">{file.tabs?.length || 0} tabs</span>
+                <span class="arrow">{isCollapsed ? "▶" : "▼"}</span>
+                {file.title || "Window"} ({file.tabs?.length || 0} tabs)
                 <span class="filename">{file.filename}</span>
             </span>
         </button>
@@ -100,13 +99,12 @@
         align-items: center;
     }
     .title-button {
-        display: flex;
-        align-items: center;
-        gap: 0;
+        display: block;
         padding: 0;
         border: 0;
         background: transparent;
         color: inherit;
+        font: inherit;
         cursor: pointer;
         user-select: none;
         text-align: left;
@@ -142,16 +140,8 @@
     }
     .title-text {
         display: flex;
-        align-items: baseline;
+        align-items: center;
         gap: 0;
-        flex-wrap: wrap;
-    }
-    .window-name {
-        font-size: 1rem;
-    }
-    .tab-count {
-        color: #444;
-        font-size: 0.9em;
     }
     .actions {
         display: flex;
