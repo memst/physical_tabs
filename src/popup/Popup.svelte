@@ -40,30 +40,31 @@
     filename?: string,
   ) {
     const tabs = await chrome.tabs.query({ currentWindow: true });
-
-    // Transform tabs for saveTabs format if needed, but saveTabs handles chrome.tabs.Tab[]
-    // However, additionalTabs are string[][]. We need to normalize.
-
-    const tabsForSaver = tabs.map((t) => ({
-      title: t.title,
-      url: t.url,
-      id: t.id,
+    const tabsForSaver = tabs.map((tab) => ({
+      title: tab.title,
+      url: tab.url,
+      id: tab.id,
     }));
 
     const originalText = saveButtonText;
     saveButtonText = "Saving...";
 
-    await saveTabs(tabsForSaver, {
-      filename,
-      additionalTabs,
-      closeTabs: true, // Popup behavior is to close tabs after save
-      handle: currentHandle,
-    });
-
-    saveButtonText = "Saved!";
-    setTimeout(() => {
-      saveButtonText = originalText;
-    }, 1500);
+    try {
+      await saveTabs(tabsForSaver, {
+        filename,
+        additionalTabs,
+        closeTabs: true,
+        handle: currentHandle,
+      });
+      saveButtonText = "Saved!";
+    } catch (err: any) {
+      saveButtonText = "Save Tabs";
+      alert("Failed to save tabs: " + err.message);
+    } finally {
+      setTimeout(() => {
+        saveButtonText = originalText;
+      }, 1500);
+    }
   }
 
   async function handleSave() {
@@ -94,34 +95,44 @@
   }
 
   function handleManage() {
-    chrome.tabs.create({ url: "src/tabs/index.html", active: true });
+    void chrome.tabs.create({ url: "src/tabs/index.html", active: true });
   }
 
-  async function handleMakeWorkspace() {
+  async function openWorkspaceWindow(windowId?: number) {
     const workspace = await createWorkspace();
-    const currentWindow = await chrome.windows.getCurrent();
-    await chrome.tabs.create({
-      windowId: currentWindow.id,
-      url: `src/workspace/index.html?id=${workspace.workspaceId}`,
-      pinned: true,
-      active: true,
-      index: 0,
-    });
-  }
+    const url = `src/workspace/index.html?id=${workspace.workspaceId}`;
 
-  async function handleCreateWorkspace() {
-    const workspace = await createWorkspace();
+    if (windowId != null) {
+      await chrome.tabs.create({
+        windowId,
+        url,
+        pinned: true,
+        active: true,
+        index: 0,
+      });
+      return;
+    }
+
     const newWindow = await chrome.windows.create({
       focused: true,
       state: "normal",
     });
     await chrome.tabs.create({
       windowId: newWindow.id,
-      url: `src/workspace/index.html?id=${workspace.workspaceId}`,
+      url,
       pinned: true,
       active: true,
       index: 0,
     });
+  }
+
+  async function handleMakeWorkspace() {
+    const currentWindow = await chrome.windows.getCurrent();
+    await openWorkspaceWindow(currentWindow.id ?? undefined);
+  }
+
+  async function handleCreateWorkspace() {
+    await openWorkspaceWindow();
   }
 
   async function onFileChange(event: Event) {
@@ -131,12 +142,11 @@
     try {
       const windowFile = await parseFile(file);
       for (const tab of windowFile.tabs) {
-        chrome.tabs.create({ url: tab.url });
+        await chrome.tabs.create({ url: tab.url });
       }
     } catch (err: any) {
       alert("Error loading file: " + err.message);
     }
-    // Clear input
     (event.target as HTMLInputElement).value = "";
   }
 
@@ -157,7 +167,7 @@
           tab = el as string[];
         } else {
           console.error("Invalid tab format", el);
-          break; // existing logic broke here
+          continue;
         }
         if (tab) old_tabs.push(tab);
       }
@@ -172,39 +182,39 @@
 
 <h3>Tab Saver</h3>
 
-<button on:click={handleSave}>{saveButtonText}</button>
-<button on:click={handleRestore}>📂 Restore Tabs</button>
-<button on:click={handleAppend}>💾📂 Append Tabs</button>
+<button onclick={handleSave}>{saveButtonText}</button>
+<button onclick={handleRestore}>📂 Restore Tabs</button>
+<button onclick={handleAppend}>💾📂 Append Tabs</button>
 
 <div class="separator"></div>
 
-<button on:click={handleManage}>🔍 Show All Windows & Tabs</button>
-<button on:click={handleMakeWorkspace}>✨ Make this a Managed Window</button>
-<button on:click={handleCreateWorkspace}>✨ Create a Managed Window</button>
+<button onclick={handleManage}>🔍 Show All Windows & Tabs</button>
+<button onclick={handleMakeWorkspace}>✨ Make this a Managed Window</button>
+<button onclick={handleCreateWorkspace}>✨ Create a Managed Window</button>
 
 <div class="separator"></div>
 
 <button
-  on:click={() => chrome.tabs.create({ url: "src/preferences/index.html" })}
+  onclick={() => void chrome.tabs.create({ url: "src/preferences/index.html" })}
   >⚙️ Settings</button
 >
 
 <div class="separator"></div>
 
-<button on:click={setFolder}>📁 Set Backup Folder</button>
+<button onclick={setFolder}>📁 Set Backup Folder</button>
 <div class="folder-status">{folderStatus}</div>
 
 <input
   type="file"
   accept=".json"
   bind:this={fileInput}
-  on:change={onFileChange}
+  onchange={onFileChange}
 />
 <input
   type="file"
   accept=".json"
   bind:this={appendInput}
-  on:change={onAppendChange}
+  onchange={onAppendChange}
 />
 
 <style>
