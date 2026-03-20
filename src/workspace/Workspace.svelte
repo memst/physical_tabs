@@ -1,58 +1,54 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import WorkspaceList from '../lib/WorkspaceList.svelte';
-  import { type WorkspaceStorage } from '../lib/workspaceStorage';
+  import {
+    refreshWorkspaceStorage,
+    type Workspace,
+    type WorkspaceStorage,
+  } from '../lib/workspaceStorage';
 
   let workspaceId: string | null = null;
-  let workspace: any = null;
+  let workspace: Workspace | null = null;
   let currentWindowId: number | null = null;
   let workspaceName = '';
   let saved = false;
   let error = '';
+  let savedTimeout: ReturnType<typeof setTimeout> | null = null;
 
   let workspaceListComp: WorkspaceList;
 
   async function init() {
-      const urlParams = new URLSearchParams(window.location.search);
-      workspaceId = urlParams.get('id');
+    const urlParams = new URLSearchParams(window.location.search);
+    workspaceId = urlParams.get('id');
 
-      if (!workspaceId) {
-          error = 'Error: No workspace ID provided';
-          return;
+    if (!workspaceId) {
+      error = 'Error: No workspace ID provided';
+      return;
+    }
+
+    try {
+      const currentWindow = await chrome.windows.getCurrent();
+      currentWindowId = currentWindow.id ?? null;
+
+      if (currentWindowId == null) {
+        error = 'Error: Unable to get current window ID';
+        return;
       }
 
-      try {
-          const currentWindow = await chrome.windows.getCurrent();
-          currentWindowId = currentWindow.id!;
+      const workspaces: WorkspaceStorage = await refreshWorkspaceStorage();
+      workspace = workspaces[workspaceId] || null;
 
-          const result = await chrome.storage.local.get('workspaces');
-          const workspaces: WorkspaceStorage = result.workspaces || {};
-          workspace = workspaces[workspaceId];
-
-          if (!workspace) {
-              error = 'Error: Workspace not found';
-              return;
-          }
-
-          if (!currentWindowId) {
-              error = 'Error: Unable to get current window ID';
-              return;
-          }
-
-          // Register window if needed
-          if (!workspace.windows.includes(currentWindowId)) {
-              workspace.windows.push(currentWindowId);
-              workspaces[workspaceId] = workspace; 
-              await chrome.storage.local.set({ workspaces });
-          }
-
-          workspaceName = workspace.name || '';
-          updateTitle(workspaceName);
-
-      } catch (err: any) {
-          error = 'Error initializing workspace: ' + err.message;
-          console.error(err);
+      if (!workspace) {
+        error = 'Error: Workspace not found';
+        return;
       }
+
+      workspaceName = workspace.name || '';
+      updateTitle(workspaceName);
+    } catch (err: any) {
+      error = 'Error initializing workspace: ' + err.message;
+      console.error(err);
+    }
   }
 
   function updateTitle(name: string) {
@@ -60,43 +56,52 @@
   }
 
   async function saveName() {
-      if (!workspaceId || !workspace) return;
-      
-      const newName = workspaceName.trim();
-      const result = await chrome.storage.local.get('workspaces');
-      const workspaces = result.workspaces || {};
+    if (!workspaceId || !workspace) return;
 
-      if (workspaces[workspaceId]) {
-           workspaces[workspaceId] = {
-              ...workspaces[workspaceId],
-              name: newName,
-              lastAccessed: Date.now()
-          };
-          workspace = workspaces[workspaceId];
-          await chrome.storage.local.set({ workspaces });
-          
-          updateTitle(newName);
-          saved = true;
-          setTimeout(() => saved = false, 2000);
-          
-          if (workspaceListComp) workspaceListComp.refresh();
-      }
+    const newName = workspaceName.trim();
+    workspaceName = newName;
+
+    const result = await chrome.storage.local.get('workspaces');
+    const workspaces = result.workspaces || {};
+
+    if (!workspaces[workspaceId]) return;
+
+    workspaces[workspaceId] = {
+      ...workspaces[workspaceId],
+      name: newName,
+      lastAccessed: Date.now(),
+    };
+    workspace = workspaces[workspaceId];
+    await chrome.storage.local.set({ workspaces });
+
+    updateTitle(newName);
+    saved = true;
+    if (savedTimeout) clearTimeout(savedTimeout);
+    savedTimeout = setTimeout(() => {
+      saved = false;
+    }, 2000);
+
+    if (workspaceListComp) await workspaceListComp.refresh();
   }
 
-  function handleKeypress(event: KeyboardEvent) {
-      if (event.key === 'Enter') {
-          saveName();
-      }
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      void saveName();
+    }
   }
 
-  function handleRefresh() {
-      // Just refresh the list
-      if (workspaceListComp) workspaceListComp.refresh();
-      return Promise.resolve();
+  async function handleRefresh() {
+    if (workspaceListComp) {
+      await workspaceListComp.refresh();
+    }
   }
 
   onMount(() => {
-    init();
+    void init();
+  });
+
+  onDestroy(() => {
+    if (savedTimeout) clearTimeout(savedTimeout);
   });
 </script>
 
@@ -109,9 +114,9 @@
               type="text" 
               bind:value={workspaceName} 
               placeholder="Enter workspace name" 
-              on:keypress={handleKeypress}
+              onkeydown={handleKeydown}
           >
-          <button on:click={saveName}>Save</button>
+          <button onclick={saveName}>Save</button>
           <span class="saved-indicator" class:show={saved}>✓ Saved</span>
       </div>
 
