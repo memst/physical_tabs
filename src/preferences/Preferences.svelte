@@ -1,3 +1,7 @@
+<script lang="ts">
+    // Placeholder for future preferences logic
+</script>
+
 <main class="page">
     <h1>Preferences</h1>
     <p>Settings configuration will appear here.</p>

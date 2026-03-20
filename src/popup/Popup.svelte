@@ -141,9 +141,9 @@
 
     try {
       const windowFile = await parseFile(file);
-      await Promise.all(
-        windowFile.tabs.map((tab) => chrome.tabs.create({ url: tab.url })),
-      );
+      for (const tab of windowFile.tabs) {
+        await chrome.tabs.create({ url: tab.url });
+      }
     } catch (err: any) {
       alert("Error loading file: " + err.message);
     }
