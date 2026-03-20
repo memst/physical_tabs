@@ -12,31 +12,35 @@ function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
 }
 
 async function getStoreValue<T>(
-    storeName: string,
     key: IDBValidKey,
 ): Promise<T | null> {
     const db = await openIndexedDB();
-    const request = db.transaction(storeName, "readonly").objectStore(storeName).get(key);
+    const request = db
+        .transaction(DIRECTORY_STORE, "readonly")
+        .objectStore(DIRECTORY_STORE)
+        .get(key);
     const value = await requestToPromise<T | undefined>(request);
     return value ?? null;
 }
 
 async function setStoreValue<T>(
-    storeName: string,
     key: IDBValidKey,
     value: T,
 ): Promise<void> {
     const db = await openIndexedDB();
-    const request = db.transaction(storeName, "readwrite").objectStore(storeName).put(value, key);
+    const request = db
+        .transaction(DIRECTORY_STORE, "readwrite")
+        .objectStore(DIRECTORY_STORE)
+        .put(value, key);
     await requestToPromise(request);
 }
 
 export async function getDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
-    return getStoreValue<FileSystemDirectoryHandle>(DIRECTORY_STORE, DIRECTORY_HANDLE_KEY);
+    return getStoreValue<FileSystemDirectoryHandle>(DIRECTORY_HANDLE_KEY);
 }
 
 export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<void> {
-    await setStoreValue(DIRECTORY_STORE, DIRECTORY_HANDLE_KEY, handle);
+    await setStoreValue(DIRECTORY_HANDLE_KEY, handle);
 }
 
 export async function deleteFile(filename: string): Promise<void> {
