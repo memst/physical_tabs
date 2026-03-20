@@ -79,7 +79,7 @@
     </div>
     {#if !isCollapsed}
         <div class="tabs-list">
-            {#each file.tabs || [] as tab (tab.url)}
+            {#each file.tabs || [] as tab}
                 <TabItem title={tab.title} url={tab.url} />
             {/each}
         </div>
