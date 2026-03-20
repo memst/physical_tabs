@@ -49,18 +49,18 @@
     .window {
         border: 1px solid #ccc;
         margin-bottom: 16px;
-        padding: 12px 14px;
+        padding: 10px;
         border-radius: 8px;
     }
     .window-title {
         font-weight: bold;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
         display: flex;
         justify-content: space-between;
         align-items: center;
     }
     .save-btn {
-        padding: 5px 10px;
+        padding: 4px 8px;
         background-color: #2196f3;
         color: white;
         border: none;
