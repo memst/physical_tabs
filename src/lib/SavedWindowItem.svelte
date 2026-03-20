@@ -6,23 +6,26 @@
     let { file, onDelete }: { file: SavedWindowFile; onDelete?: () => void } =
         $props();
 
-    // Initialize state from LocalStorage
-    let isCollapsed = $state(
-        JSON.parse(
-            localStorage.getItem("collapse_" + file.filename) || "false",
-        ),
-    );
+    const collapseKey = (filename: string) => `collapse_${filename}`;
+
+    function readCollapseState(filename: string): boolean {
+        return localStorage.getItem(collapseKey(filename)) === "true";
+    }
+
+    function writeCollapseState(filename: string, value: boolean): void {
+        localStorage.setItem(collapseKey(filename), String(value));
+    }
+
+    let isCollapsed = $state(false);
+
+    $effect(() => {
+        isCollapsed = readCollapseState(file.filename);
+    });
 
     function toggleCollapse() {
         isCollapsed = !isCollapsed;
-        localStorage.setItem("collapse_" + file.filename, String(isCollapsed));
+        writeCollapseState(file.filename, isCollapsed);
     }
-
-    $effect(() => {
-        isCollapsed = JSON.parse(
-            localStorage.getItem("collapse_" + file.filename) || "false",
-        );
-    });
 
     async function onRestore(e: MouseEvent) {
         e.stopPropagation();
@@ -43,25 +46,35 @@
 
 <div class="window">
     <div
-        class="window-title"
+        class="window-header"
         onclick={toggleCollapse}
         role="button"
         tabindex="0"
-        onkeydown={(e) => e.key === "Enter" && toggleCollapse()}
+        aria-expanded={!isCollapsed}
+        onkeydown={(e) => (e.key === "Enter" || e.key === " ") && toggleCollapse()}
     >
-        <span class="title-text">
-            <span class="arrow">{isCollapsed ? "▶" : "▼"}</span>
-            {file.title || "Window"} ({file.tabs?.length || 0} tabs)
-            <span class="filename">{file.filename}</span>
+        <span class="title-button">
+            <span class="title-text">
+                <span class="arrow">{isCollapsed ? "▶" : "▼"}</span>
+                {file.title || "Window"} ({file.tabs?.length || 0} tabs)
+                <span class="filename">{file.filename}</span>
+            </span>
         </span>
         <div class="actions">
-            <button onclick={onAppend} class="append-btn">Append</button>
+            <button type="button" onclick={onAppend} class="append-btn">
+                Append
+            </button>
             <button
+                type="button"
                 onclick={onRestoreAndDelete}
                 class="restore-del-btn"
-                title="Restore and Delete">Restore & Delete</button
+                title="Restore and Delete"
             >
-            <button onclick={onRestore} class="restore-btn">Restore</button>
+                Restore & Delete
+            </button>
+            <button type="button" onclick={onRestore} class="restore-btn">
+                Restore
+            </button>
         </div>
     </div>
     {#if !isCollapsed}
@@ -81,7 +94,7 @@
         border-radius: 5px;
         background-color: white;
     }
-    .window-title {
+    .window-header {
         font-weight: bold;
         display: flex;
         justify-content: space-between;
@@ -89,9 +102,8 @@
         cursor: pointer;
         user-select: none;
     }
-    .title-text {
-        display: flex;
-        align-items: center;
+    .title-button {
+        display: block;
     }
     .tabs-list {
         margin-top: 5px;
@@ -122,9 +134,15 @@
         margin-left: 8px;
         font-size: 0.9em;
     }
+    .title-text {
+        display: flex;
+        align-items: center;
+        gap: 0;
+    }
     .actions {
         display: flex;
         gap: 8px;
+        justify-content: flex-end;
     }
     .restore-del-btn {
         padding: 4px 8px;
