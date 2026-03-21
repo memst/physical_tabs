@@ -1,11 +1,10 @@
 <script lang="ts">
-    import { onMount, onDestroy } from "svelte";
+    import { onMount, tick } from "svelte";
     import WorkspaceList from "../lib/WorkspaceList.svelte";
     import WindowTabList from "../lib/WindowTabList.svelte";
     import SavedWindowItem from "../lib/SavedWindowItem.svelte";
     import {
         type WorkspaceStorage,
-        refreshWorkspaceStorage,
     } from "../lib/workspaceStorage";
     import { getDirectoryHandle, deleteFile } from "../lib/db";
     import {
@@ -19,8 +18,9 @@
     let showModal = $state(false);
     let importText = $state("");
     let savedFiles: SavedWindowFile[] = $state([]);
+    let refreshInProgress = false;
+    let refreshQueued = false;
 
-    // Cleanup inactive windows logic (ported from tabs.ts)
     async function cleanupInactiveWindows(): Promise<WorkspaceStorage> {
         const result = await chrome.storage.local.get("workspaces");
         const workspaces: WorkspaceStorage = result.workspaces || {};
@@ -47,39 +47,102 @@
 
     async function loadFiles() {
         const handle = await getDirectoryHandle();
-        if (handle) {
-            const entries: SavedWindowFile[] = [];
-            await handle.requestPermission();
-            for await (const [name, entry] of handle.entries()) {
-                if (name === ".DS_Store") continue;
-                if (entry.kind === "file") {
-                    const file = await entry.getFile();
-                    const window = await parseFile(file);
-                    entries.push(window);
-                }
-            }
-            savedFiles = entries.sort(compareSavedWindowFile);
+        if (!handle) {
+            savedFiles = [];
+            return;
         }
+
+        const entries: SavedWindowFile[] = [];
+        await handle.requestPermission();
+        for await (const [name, entry] of handle.entries()) {
+            if (name === ".DS_Store") continue;
+            if (entry.kind === "file") {
+                const file = await entry.getFile();
+                const savedWindow = await parseFile(file);
+                entries.push(savedWindow);
+            }
+        }
+        savedFiles = entries.sort(compareSavedWindowFile);
     }
 
     async function refresh() {
-        await cleanupInactiveWindows();
+        if (refreshInProgress) {
+            refreshQueued = true;
+            return;
+        }
+        refreshInProgress = true;
 
-        refreshWorkspaceStorage();
-        loadFiles();
-        windows = await chrome.windows.getAll({ populate: true });
-        if (workspaceListComp) workspaceListComp.refresh();
+        try {
+            await cleanupInactiveWindows();
+            await loadFiles();
+            windows = await chrome.windows.getAll({ populate: true });
+            if (workspaceListComp) {
+                await workspaceListComp.refresh();
+            }
+        } finally {
+            refreshInProgress = false;
+            if (refreshQueued) {
+                refreshQueued = false;
+                void refresh();
+            }
+        }
     }
 
-    let interval: number;
-
     onMount(() => {
-        refresh();
-        interval = window.setInterval(refresh, 5000);
-    });
+        void refresh();
 
-    onDestroy(() => {
-        if (interval) clearInterval(interval);
+        const handleWindowChange = () => {
+            void refresh();
+        };
+        const handleTabUpdated = (
+            _tabId: number,
+            changeInfo: chrome.tabs.TabChangeInfo,
+        ) => {
+            if (
+                changeInfo.status === "complete" ||
+                changeInfo.title !== undefined ||
+                changeInfo.url !== undefined ||
+                changeInfo.pinned !== undefined
+            ) {
+                void refresh();
+            }
+        };
+        const handleStorageChange = (
+            changes: Record<string, chrome.storage.StorageChange>,
+            areaName: string,
+        ) => {
+            if (areaName === "local" && changes.workspaces) {
+                void refresh();
+            }
+        };
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                void refresh();
+            }
+        };
+
+        chrome.windows.onCreated.addListener(handleWindowChange);
+        chrome.windows.onRemoved.addListener(handleWindowChange);
+        chrome.tabs.onCreated.addListener(handleWindowChange);
+        chrome.tabs.onRemoved.addListener(handleWindowChange);
+        chrome.tabs.onUpdated.addListener(handleTabUpdated);
+        chrome.storage.onChanged.addListener(handleStorageChange);
+        window.addEventListener("focus", handleWindowChange);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        return () => {
+            chrome.windows.onCreated.removeListener(handleWindowChange);
+            chrome.windows.onRemoved.removeListener(handleWindowChange);
+            chrome.tabs.onCreated.removeListener(handleWindowChange);
+            chrome.tabs.onRemoved.removeListener(handleWindowChange);
+            chrome.tabs.onUpdated.removeListener(handleTabUpdated);
+            chrome.storage.onChanged.removeListener(handleStorageChange);
+            window.removeEventListener("focus", handleWindowChange);
+            document.removeEventListener(
+                "visibilitychange",
+                handleVisibilityChange,
+            );
+        };
     });
 
     function focusTab(windowId: number, tabId: number) {
@@ -89,9 +152,9 @@
 
     function openImportModal() {
         showModal = true;
-        setTimeout(() => {
+        void tick().then(() => {
             document.getElementById("import-urls")?.focus();
-        }, 50);
+        });
     }
 
     function closeImportModal() {
@@ -115,7 +178,7 @@
     function importTabs() {
         const urls = parseUrls(importText);
         if (urls.length > 0) {
-            chrome.windows.create({ url: urls });
+            void chrome.windows.create({ url: urls });
             closeImportModal();
             importText = "";
         } else {
@@ -163,10 +226,30 @@
     <WindowTabList {windows} onTabClick={focusTab} />
 
     {#if showModal}
-        <div class="modal" onclick={closeImportModal}>
-            <div class="modal-content">
-                <span class="close" onclick={closeImportModal}>&times;</span>
-                <h3 style="margin-top: 0;">Import List of Tabs</h3>
+        <div class="modal" role="presentation">
+            <button
+                type="button"
+                class="modal-backdrop"
+                aria-label="Close import modal"
+                onclick={closeImportModal}
+            ></button>
+            <div
+                class="modal-content"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="import-dialog-title"
+            >
+                <button
+                    type="button"
+                    class="close"
+                    aria-label="Close import modal"
+                    onclick={closeImportModal}
+                >
+                    &times;
+                </button>
+                <h3 id="import-dialog-title" style="margin-top: 0;">
+                    Import List of Tabs
+                </h3>
                 <p>Paste your list of URLs below:</p>
                 <textarea
                     id="import-urls"
@@ -175,9 +258,9 @@
                     placeholder="1. https://example.com&#10;2. https://google.com"
                 >
                 </textarea>
-                <button class="import-action-btn" onclick={importTabs}
-                    >Open in New Window</button
-                >
+                <button class="import-action-btn" onclick={importTabs}>
+                    Open in New Window
+                </button>
             </div>
         </div>
     {/if}
@@ -201,33 +284,45 @@
         background-color: #f5f5f5;
         border-radius: 5px;
     }
-    /* .file-list removed */
-    /* Modal Styles */
     .modal {
-        display: block;
+        display: grid;
+        place-items: center;
         position: fixed;
         z-index: 1;
         left: 0;
         top: 0;
         width: 100%;
         height: 100%;
-        overflow: auto;
+    }
+    .modal-backdrop {
+        position: absolute;
+        inset: 0;
+        border: 0;
         background-color: rgba(0, 0, 0, 0.4);
+        cursor: pointer;
     }
     .modal-content {
+        position: relative;
+        z-index: 1;
         background-color: #fefefe;
-        margin: 15% auto;
         padding: 20px;
         border: 1px solid #888;
         width: 80%;
         max-width: 500px;
+        border-radius: 8px;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
     }
     .close {
+        appearance: none;
+        background: transparent;
+        border: none;
         color: #aaa;
-        float: right;
         font-size: 28px;
         font-weight: bold;
         cursor: pointer;
+        line-height: 1;
+        margin-left: auto;
+        padding: 0;
     }
     .close:hover,
     .close:focus {
