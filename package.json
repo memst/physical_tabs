@@ -1,5 +1,5 @@
 {
-    "name": "tab_manager",
+    "name": "physical-tabs",
     "version": "1.0.0",
     "description": "Chrome extension to manage tabs and workspaces, migrated to TypeScript.",
     "type": "module",

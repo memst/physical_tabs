@@ -9,7 +9,7 @@ A Chrome Manifest V3 extension for managing browser tabs and workspaces. It allo
 2.  **Persistent Backup**: Automatically save tabs to a user-selected local folder using the File System Access API.
 3.  **Workspaces**: Organize windows into named workspaces with persistent tracking.
 4.  **Import**: Batch open URLs from a text list.
-5.  **Tab Manager**: Visualize and manage open windows and tabs.
+5.  **Tabs Page**: Visualize and manage open windows and tabs.
 
 **Tech Stack**:
 -   **Framework**: Svelte 4/5 + TypeScript
@@ -41,9 +41,9 @@ After building, load the `dist/` directory in Chrome (`chrome://extensions` > "L
     -   `WorkspaceList.svelte`: Reusable UI component for listing workspaces.
 -   **`src/popup/`**: Extension popup.
     -   `Popup.svelte`: Main UI for saving, restoring, and setting backup folder.
--   **`src/tabs/`**: Full-page tab manager (`tabs.html`).
+-   **`src/tabs/`**: Full-page tabs page (`tabs.html`).
     -   `Tabs.svelte`: Lists all windows/tabs, handles import.
--   **`src/workspace/`**: Workspace manager (`workspace.html`).
+-   **`src/workspace/`**: Workspace page (`workspace.html`).
     -   `Workspace.svelte`: Managed window UI, workspace renaming.
 
 ### Key Features & Implementation

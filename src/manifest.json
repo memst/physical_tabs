@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Tab Saver",
+  "name": "Physical Tabs",
   "version": "1.0",
   "description": "Save and restore your open tabs to and from a file.",
   "permissions": [
@@ -12,7 +12,7 @@
   ],
   "action": {
     "default_popup": "src/popup/index.html",
-    "default_title": "Tab Saver"
+    "default_title": "Physical Tabs"
   },
   "web_accessible_resources": [
     {

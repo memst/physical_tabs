@@ -1,6 +1,6 @@
-# Tab Saver
+# Physical Tabs
 
-Tab Saver is a Chrome extension for saving, restoring, and organizing browser tabs and windows.
+Physical Tabs is a Chrome extension for saving, restoring, and organizing browser tabs and windows.
 
 ## What It Does
 
@@ -49,7 +49,7 @@ pnpm dev:watch
 ## Project Structure
 
 - `src/popup/`: extension popup UI
-- `src/tabs/`: tab manager page
-- `src/workspace/`: workspace manager page
+- `src/tabs/`: tabs page
+- `src/workspace/`: workspace page
 - `src/preferences/`: preferences UI
 - `src/lib/`: shared logic and storage helpers

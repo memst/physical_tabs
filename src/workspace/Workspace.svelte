@@ -52,7 +52,7 @@
   }
 
   function updateTitle(name: string) {
-      document.title = name ? `${name} - Workspace Manager` : 'Workspace Manager';
+      document.title = name ? `${name} - Physical Tabs` : 'Physical Tabs - Workspace';
   }
 
   async function saveName() {

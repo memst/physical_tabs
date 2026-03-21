@@ -180,7 +180,7 @@
   }
 </script>
 
-<h3>Tab Saver</h3>
+<h3>Physical Tabs</h3>
 
 <button onclick={handleSave}>{saveButtonText}</button>
 <button onclick={handleRestore}>📂 Restore Tabs</button>
